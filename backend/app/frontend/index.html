@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NYC Zoning Feasibility Engine</title>
+<style>
+:root {
+  --blue: #4A90D9;
+  --dark: #1a1a2e;
+  --grey: #666;
+  --light: #f0f4f8;
+  --border: #e0e0e0;
+  --green: #2ecc71;
+  --red: #e74c3c;
+  --orange: #f39c12;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color: var(--dark); background: #fafbfc; }
+.container { max-width: 1100px; margin: 0 auto; padding: 20px; }
+
+/* Header */
+header { background: var(--dark); color: white; padding: 24px 0; margin-bottom: 24px; }
+header .container { display: flex; align-items: center; justify-content: space-between; }
+header h1 { font-size: 22px; font-weight: 600; }
+header .version { font-size: 12px; opacity: 0.6; }
+
+/* Input Section */
+.input-section { background: white; border-radius: 8px; border: 1px solid var(--border); padding: 24px; margin-bottom: 24px; }
+.input-mode-toggle { display: flex; gap: 8px; margin-bottom: 16px; }
+.input-mode-toggle button {
+  padding: 8px 16px; border: 1px solid var(--border); border-radius: 4px;
+  background: white; cursor: pointer; font-size: 13px; transition: all 0.2s;
+}
+.input-mode-toggle button.active { background: var(--blue); color: white; border-color: var(--blue); }
+.input-row { display: flex; gap: 12px; align-items: flex-end; margin-bottom: 12px; }
+.input-row .field { flex: 1; }
+.input-row label { display: block; font-size: 12px; font-weight: 600; color: var(--grey); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+.input-row input {
+  width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 4px;
+  font-size: 14px; transition: border 0.2s;
+}
+.input-row input:focus { border-color: var(--blue); outline: none; box-shadow: 0 0 0 3px rgba(74,144,217,0.1); }
+.btn { padding: 10px 24px; border: none; border-radius: 4px; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+.btn-primary { background: var(--blue); color: white; }
+.btn-primary:hover { background: #357ABD; }
+.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-secondary { background: white; color: var(--blue); border: 1px solid var(--blue); }
+.btn-secondary:hover { background: var(--light); }
+.btn-sm { padding: 6px 14px; font-size: 12px; }
+.btn-danger { background: var(--red); color: white; }
+.btn-success { background: var(--green); color: white; }
+.add-lot-btn { margin-top: 8px; }
+.extra-lot { position: relative; }
+.remove-lot { position: absolute; right: -30px; top: 28px; background: none; border: none; color: var(--red); cursor: pointer; font-size: 18px; }
+
+/* Loading */
+.loading { text-align: center; padding: 60px 20px; display: none; }
+.loading.visible { display: block; }
+.spinner { width: 40px; height: 40px; border: 4px solid var(--border); border-top-color: var(--blue); border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 16px; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.loading p { color: var(--grey); font-size: 14px; }
+
+/* Error */
+.error-box { background: #fdf2f2; border: 1px solid #fca5a5; border-radius: 8px; padding: 16px; margin-bottom: 24px; display: none; }
+.error-box.visible { display: block; }
+.error-box h3 { color: var(--red); font-size: 14px; margin-bottom: 4px; }
+.error-box p { color: #991b1b; font-size: 13px; }
+
+/* Results */
+#results { display: none; }
+#results.visible { display: block; }
+
+/* Cards */
+.card { background: white; border-radius: 8px; border: 1px solid var(--border); margin-bottom: 16px; overflow: hidden; }
+.card-header { padding: 14px 20px; background: var(--light); border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+.card-header h2 { font-size: 16px; color: var(--dark); }
+.card-header .badge { font-size: 11px; padding: 3px 8px; border-radius: 12px; font-weight: 600; }
+.badge-blue { background: rgba(74,144,217,0.15); color: var(--blue); }
+.badge-green { background: rgba(46,204,113,0.15); color: #27ae60; }
+.card-body { padding: 20px; }
+
+/* KV Table */
+.kv-table { width: 100%; border-collapse: collapse; }
+.kv-table td { padding: 6px 0; font-size: 13px; border-bottom: 1px solid #f0f0f0; }
+.kv-table td:first-child { color: var(--grey); font-weight: 500; width: 40%; }
+.kv-table td:last-child { font-weight: 600; text-align: right; }
+
+/* Data Table */
+.data-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.data-table th { background: var(--light); padding: 8px 10px; text-align: left; font-weight: 600; border-bottom: 2px solid var(--border); font-size: 11px; text-transform: uppercase; letter-spacing: 0.3px; }
+.data-table td { padding: 7px 10px; border-bottom: 1px solid #f0f0f0; }
+.data-table tr:hover { background: #f8f9fa; }
+.data-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+.data-table .highlight { background: rgba(46,204,113,0.08); }
+
+/* Tabs */
+.tabs { display: flex; gap: 0; border-bottom: 2px solid var(--border); margin-bottom: 16px; }
+.tab {
+  padding: 10px 20px; font-size: 13px; font-weight: 500; cursor: pointer;
+  border-bottom: 2px solid transparent; margin-bottom: -2px; color: var(--grey); transition: all 0.2s;
+}
+.tab:hover { color: var(--dark); }
+.tab.active { color: var(--blue); border-bottom-color: var(--blue); }
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+
+/* Scenario Grid */
+.scenario-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+.scenario-card { border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+.scenario-card .sc-header { padding: 12px 16px; background: var(--light); font-weight: 600; font-size: 14px; border-bottom: 1px solid var(--border); }
+.scenario-card .sc-body { padding: 16px; }
+
+/* PDF Button */
+.pdf-section { text-align: center; padding: 20px; background: var(--light); border-radius: 8px; margin-top: 24px; }
+.pdf-section p { font-size: 13px; color: var(--grey); margin-bottom: 12px; }
+
+/* Footer */
+footer { text-align: center; padding: 30px 20px; color: var(--grey); font-size: 12px; border-top: 1px solid var(--border); margin-top: 40px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="container">
+    <div>
+      <h1>NYC Zoning Feasibility Engine</h1>
+      <span class="version">v2.0</span>
+    </div>
+    <div style="font-size:12px;opacity:0.7">Preliminary analysis only</div>
+  </div>
+</header>
+
+<div class="container">
+  <!-- Input Section -->
+  <div class="input-section">
+    <div class="input-mode-toggle">
+      <button class="active" onclick="setMode('address')">Address</button>
+      <button onclick="setMode('bbl')">BBL</button>
+    </div>
+
+    <div id="input-address">
+      <div class="input-row" id="lot-inputs">
+        <div class="field">
+          <label>NYC Street Address</label>
+          <input type="text" id="address-input" placeholder="e.g. 110 East 53rd St, Brooklyn, NY" onkeydown="if(event.key==='Enter')analyze()">
+        </div>
+        <button class="btn btn-primary" onclick="analyze()" id="analyze-btn">Analyze</button>
+      </div>
+      <div id="extra-lots"></div>
+      <button class="btn btn-secondary btn-sm add-lot-btn" onclick="addLot()">+ Add another lot (assemblage)</button>
+    </div>
+
+    <div id="input-bbl" style="display:none">
+      <div class="input-row">
+        <div class="field">
+          <label>BBL (Borough-Block-Lot)</label>
+          <input type="text" id="bbl-input" placeholder="e.g. 3046220022 or 3-04622-0022" onkeydown="if(event.key==='Enter')analyze()">
+        </div>
+        <button class="btn btn-primary" onclick="analyze()" id="analyze-btn-bbl">Analyze</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Loading -->
+  <div class="loading" id="loading">
+    <div class="spinner"></div>
+    <p>Analyzing zoning potential...</p>
+    <p style="font-size:12px;margin-top:4px;opacity:0.7">This may take a few seconds</p>
+  </div>
+
+  <!-- Error -->
+  <div class="error-box" id="error-box">
+    <h3>Analysis Error</h3>
+    <p id="error-msg"></p>
+  </div>
+
+  <!-- Results -->
+  <div id="results">
+    <!-- Site Summary -->
+    <div class="card" id="site-summary-card">
+      <div class="card-header">
+        <h2>Site Summary</h2>
+        <span class="badge badge-blue" id="zoning-badge"></span>
+      </div>
+      <div class="card-body">
+        <table class="kv-table" id="site-table"></table>
+      </div>
+    </div>
+
+    <!-- Zoning Overview -->
+    <div class="card">
+      <div class="card-header">
+        <h2>Zoning Overview</h2>
+      </div>
+      <div class="card-body" id="zoning-overview"></div>
+    </div>
+
+    <!-- Development Scenarios -->
+    <div class="card">
+      <div class="card-header">
+        <h2>Development Scenarios</h2>
+        <span class="badge badge-green" id="scenario-count-badge"></span>
+      </div>
+      <div class="card-body">
+        <div class="tabs" id="scenario-tabs"></div>
+        <div id="scenario-contents"></div>
+      </div>
+    </div>
+
+    <!-- Comparison Table -->
+    <div class="card">
+      <div class="card-header">
+        <h2>Scenario Comparison</h2>
+      </div>
+      <div class="card-body">
+        <table class="data-table" id="comparison-table"></table>
+      </div>
+    </div>
+
+    <!-- Parking Analysis -->
+    <div class="card" id="parking-card" style="display:none">
+      <div class="card-header">
+        <h2>Parking Analysis</h2>
+      </div>
+      <div class="card-body" id="parking-body"></div>
+    </div>
+
+    <!-- PDF Report + 3D Viewer -->
+    <div class="pdf-section">
+      <p>Download a comprehensive PDF report with all analysis details</p>
+      <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap">
+        <button class="btn btn-primary" onclick="downloadReport()">Download PDF Report</button>
+        <button class="btn btn-success" id="massing-btn" style="display:none" onclick="openMassingViewer()">View 3D Massing</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<footer>
+  <p>NYC Zoning Feasibility Engine &middot; For preliminary analysis only &middot; Not a substitute for professional zoning advice</p>
+</footer>
+
+<script>
+const API_BASE = '';  // Same origin
+
+let currentMode = 'address';
+let extraLots = 0;
+let lastResult = null;
+
+function setMode(mode) {
+  currentMode = mode;
+  document.querySelectorAll('.input-mode-toggle button').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+  document.getElementById('input-address').style.display = mode === 'address' ? 'block' : 'none';
+  document.getElementById('input-bbl').style.display = mode === 'bbl' ? 'block' : 'none';
+}
+
+function addLot() {
+  extraLots++;
+  const div = document.createElement('div');
+  div.className = 'input-row extra-lot';
+  div.id = `extra-lot-${extraLots}`;
+  div.innerHTML = `
+    <div class="field">
+      <label>Additional Address #${extraLots}</label>
+      <input type="text" class="extra-address" placeholder="Enter another address for assemblage">
+    </div>
+    <button class="remove-lot" onclick="removeLot(${extraLots})">&times;</button>
+  `;
+  document.getElementById('extra-lots').appendChild(div);
+}
+
+function removeLot(n) {
+  const el = document.getElementById(`extra-lot-${n}`);
+  if (el) el.remove();
+}
+
+function normalizeBBL(raw) {
+  // Accept 3046220022, 3-04622-0022, 3/04622/0022
+  const cleaned = raw.replace(/[-\/\s]/g, '');
+  if (/^\d{10}$/.test(cleaned)) return cleaned;
+  return null;
+}
+
+async function analyze() {
+  const loading = document.getElementById('loading');
+  const errorBox = document.getElementById('error-box');
+  const results = document.getElementById('results');
+
+  // Reset UI
+  loading.classList.add('visible');
+  errorBox.classList.remove('visible');
+  results.classList.remove('visible');
+
+  // Build request body
+  let body = {};
+  if (currentMode === 'bbl') {
+    const raw = document.getElementById('bbl-input').value.trim();
+    const bbl = normalizeBBL(raw);
+    if (!bbl) {
+      showError('Invalid BBL format. Use 10 digits like 3046220022 or 3-04622-0022.');
+      loading.classList.remove('visible');
+      return;
+    }
+    body.bbl = bbl;
+  } else {
+    const addr = document.getElementById('address-input').value.trim();
+    if (!addr) {
+      showError('Please enter an NYC address.');
+      loading.classList.remove('visible');
+      return;
+    }
+    body.address = addr;
+  }
+
+  try {
+    const resp = await fetch(`${API_BASE}/api/v1/full-analysis`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      throw new Error(err.detail || `Server error (${resp.status})`);
+    }
+
+    lastResult = await resp.json();
+    renderResults(lastResult);
+    results.classList.add('visible');
+
+    // Show 3D Massing button if we have a BBL
+    const bbl = lastResult.lot?.bbl;
+    const massingBtn = document.getElementById('massing-btn');
+    if (bbl && massingBtn) massingBtn.style.display = 'inline-block';
+  } catch (e) {
+    showError(e.message);
+  } finally {
+    loading.classList.remove('visible');
+  }
+}
+
+function showError(msg) {
+  document.getElementById('error-msg').textContent = msg;
+  document.getElementById('error-box').classList.add('visible');
+}
+
+function fmt(n, dec=0) {
+  if (n == null || n === undefined || isNaN(n)) return 'N/A';
+  return Number(n).toLocaleString('en-US', {minimumFractionDigits: dec, maximumFractionDigits: dec});
+}
+
+function renderResults(data) {
+  renderSiteSummary(data.lot);
+  renderZoningOverview(data.zoning);
+  renderScenarios(data.scenarios, data.building_programs);
+  renderComparison(data.comparison_table, data.scenarios);
+  renderParking(data.parking_layout);
+}
+
+function renderSiteSummary(lot) {
+  const districts = lot.zoning_districts || [];
+  document.getElementById('zoning-badge').textContent = districts.join(', ') || 'Unknown';
+
+  const rows = [
+    ['Address', lot.address || 'N/A'],
+    ['BBL', lot.bbl],
+    ['Borough', {1:'Manhattan',2:'Bronx',3:'Brooklyn',4:'Queens',5:'Staten Island'}[lot.borough] || lot.borough],
+    ['Lot Area', `${fmt(lot.lot_area)} SF`],
+    ['Lot Dimensions', `${fmt(lot.lot_frontage)}' × ${fmt(lot.lot_depth)}'`],
+    ['Lot Type', (lot.lot_type || '').replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())],
+    ['Street Width', `${(lot.street_width||'').charAt(0).toUpperCase()}${(lot.street_width||'').slice(1)} street`],
+  ];
+  if (lot.overlays && lot.overlays.length) rows.push(['Overlays', lot.overlays.join(', ')]);
+  if (lot.special_districts && lot.special_districts.length) rows.push(['Special Districts', lot.special_districts.join(', ')]);
+  if (lot.is_mih_area) rows.push(['MIH', lot.mih_option || 'Yes']);
+
+  document.getElementById('site-table').innerHTML = rows.map(r =>
+    `<tr><td>${r[0]}</td><td>${r[1]}</td></tr>`
+  ).join('');
+}
+
+function renderZoningOverview(zoning) {
+  const env = zoning.envelope;
+  let html = '<table class="kv-table">';
+
+  if (env.residential_far) html += `<tr><td>Residential FAR</td><td>${env.residential_far}</td></tr>`;
+  if (env.max_residential_zfa) html += `<tr><td>Max Residential ZFA</td><td>${fmt(env.max_residential_zfa)} SF</td></tr>`;
+  if (env.commercial_far) html += `<tr><td>Commercial FAR</td><td>${env.commercial_far}</td></tr>`;
+  if (env.cf_far) html += `<tr><td>Community Facility FAR</td><td>${env.cf_far}</td></tr>`;
+  if (env.quality_housing) html += `<tr><td>Program</td><td>Quality Housing</td></tr>`;
+  else if (env.height_factor) html += `<tr><td>Program</td><td>Height Factor</td></tr>`;
+  if (env.base_height_max) html += `<tr><td>Max Base Height</td><td>${env.base_height_max} ft</td></tr>`;
+  if (env.max_building_height) html += `<tr><td>Max Building Height</td><td>${env.max_building_height} ft</td></tr>`;
+  html += `<tr><td>Rear Yard</td><td>${env.rear_yard} ft</td></tr>`;
+  if (env.lot_coverage_max) html += `<tr><td>Max Lot Coverage</td><td>${env.lot_coverage_max}%</td></tr>`;
+
+  html += '</table>';
+
+  // City of Yes info
+  if (zoning.city_of_yes) {
+    const coy = zoning.city_of_yes;
+    html += '<h3 style="margin-top:14px;font-size:13px;color:var(--blue)">City of Yes Provisions</h3>';
+    html += '<table class="kv-table">';
+    if (coy.adu_eligible !== undefined) html += `<tr><td>ADU Eligible</td><td>${coy.adu_eligible ? 'Yes' : 'No'}</td></tr>`;
+    if (coy.transit_oriented !== undefined) html += `<tr><td>Transit-Oriented</td><td>${coy.transit_oriented ? 'Yes' : 'No'}</td></tr>`;
+    if (coy.town_center !== undefined) html += `<tr><td>Town Center</td><td>${coy.town_center ? 'Yes' : 'No'}</td></tr>`;
+    html += '</table>';
+  }
+
+  document.getElementById('zoning-overview').innerHTML = html;
+}
+
+function renderScenarios(scenarios, buildingPrograms) {
+  const tabsEl = document.getElementById('scenario-tabs');
+  const contentsEl = document.getElementById('scenario-contents');
+  document.getElementById('scenario-count-badge').textContent = `${scenarios.length} scenarios`;
+
+  tabsEl.innerHTML = scenarios.map((s, i) =>
+    `<div class="tab ${i===0?'active':''}" onclick="switchTab(${i})">${s.name}</div>`
+  ).join('');
+
+  contentsEl.innerHTML = scenarios.map((s, i) => {
+    const bp = buildingPrograms && buildingPrograms[i];
+    return `<div class="tab-content ${i===0?'active':''}" id="tab-${i}">
+      ${renderScenarioDetail(s, bp)}
+    </div>`;
+  }).join('');
+}
+
+function switchTab(idx) {
+  document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', i===idx));
+  document.querySelectorAll('.tab-content').forEach((c,i) => c.classList.toggle('active', i===idx));
+}
+
+function renderScenarioDetail(s, bp) {
+  let html = `<p style="color:var(--grey);font-size:13px;margin-bottom:12px">${s.description}</p>`;
+
+  // Key metrics
+  html += '<table class="kv-table">';
+  html += `<tr><td>Zoning Floor Area</td><td>${fmt(s.zoning_floor_area)} SF</td></tr>`;
+  html += `<tr><td>Total Gross SF</td><td>${fmt(s.total_gross_sf)} SF</td></tr>`;
+  html += `<tr><td>FAR Used</td><td>${Number(s.far_used).toFixed(2)}</td></tr>`;
+  html += `<tr><td>Height</td><td>${fmt(s.max_height_ft)} ft</td></tr>`;
+  html += `<tr><td>Floors</td><td>${s.num_floors}</td></tr>`;
+  if (s.residential_sf) html += `<tr><td>Residential SF</td><td>${fmt(s.residential_sf)} SF</td></tr>`;
+  if (s.commercial_sf) html += `<tr><td>Commercial SF</td><td>${fmt(s.commercial_sf)} SF</td></tr>`;
+  if (s.total_units) html += `<tr><td>Total Units</td><td>${s.total_units}</td></tr>`;
+  html += '</table>';
+
+  // Building program
+  if (bp) {
+    html += '<h3 style="margin:14px 0 8px;font-size:13px;font-weight:600">Building Program</h3>';
+    html += '<table class="kv-table">';
+    html += `<tr><td>Building Class</td><td>${bp.building_class || 'N/A'}</td></tr>`;
+    html += `<tr><td>Net Rentable Residential</td><td>${fmt(bp.net_rentable_residential)} SF</td></tr>`;
+    if (bp.net_rentable_commercial) html += `<tr><td>Net Rentable Commercial</td><td>${fmt(bp.net_rentable_commercial)} SF</td></tr>`;
+    html += `<tr><td>Loss Factor</td><td>${Number(bp.loss_factor_pct).toFixed(1)}%</td></tr>`;
+    html += `<tr><td>Efficiency Ratio</td><td>${(Number(bp.efficiency_ratio)*100).toFixed(1)}%</td></tr>`;
+    html += '</table>';
+
+    // Core breakdown
+    if (bp.core) {
+      html += '<h3 style="margin:14px 0 8px;font-size:13px;font-weight:600">Core Breakdown</h3>';
+      html += '<table class="kv-table">';
+      html += `<tr><td>Stairs</td><td>${bp.core.stairs} (${fmt(bp.core.stair_sf_per_floor)} SF/floor)</td></tr>`;
+      html += `<tr><td>Elevators</td><td>${bp.core.elevators} (${fmt(bp.core.elevator_sf_per_floor)} SF/floor)</td></tr>`;
+      html += `<tr><td>Core Total/Floor</td><td>${fmt(bp.core.total_core_sf_per_floor)} SF (${Number(bp.core.core_percentage).toFixed(1)}%)</td></tr>`;
+      html += '</table>';
+    }
+
+    // Unit mix options
+    if (bp.unit_mix_options && bp.unit_mix_options.length) {
+      html += '<h3 style="margin:14px 0 8px;font-size:13px;font-weight:600">Unit Mix Options</h3>';
+      html += '<table class="data-table"><tr><th>Strategy</th><th>Total Units</th><th>Avg SF</th><th>Mix</th></tr>';
+      bp.unit_mix_options.forEach(m => {
+        const mix = (m.units||[]).map(u => `${u.count} ${u.type}`).join(', ');
+        html += `<tr><td>${m.strategy}</td><td class="num">${m.total_units}</td><td class="num">${fmt(m.average_unit_sf)}</td><td>${mix}</td></tr>`;
+      });
+      html += '</table>';
+    }
+  }
+
+  // Parking
+  if (s.parking && s.parking.total_spaces_required > 0) {
+    html += '<h3 style="margin:14px 0 8px;font-size:13px;font-weight:600">Parking</h3>';
+    html += `<p style="font-size:13px">${s.parking.total_spaces_required} spaces required`;
+    if (s.parking.waiver_eligible) html += ' <span style="color:var(--green)">(waiver eligible)</span>';
+    html += '</p>';
+  }
+
+  return html;
+}
+
+function renderComparison(table, scenarios) {
+  if (!table || !scenarios || !scenarios.length) return;
+
+  const names = scenarios.map(s => s.name);
+  let html = '<tr><th>Metric</th>';
+  names.forEach(n => html += `<th>${n}</th>`);
+  html += '</tr>';
+
+  const metrics = [
+    ['Zoning Floor Area', 'total_zfa', v => fmt(v)+' SF'],
+    ['Max Height', 'max_height', v => fmt(v)+' ft'],
+    ['Floors', 'floors', v => v],
+    ['FAR Used', 'far_used', v => Number(v).toFixed(2)],
+    ['Residential SF', 'residential_sf', v => v ? fmt(v)+' SF' : '—'],
+    ['Commercial SF', 'commercial_sf', v => v ? fmt(v)+' SF' : '—'],
+    ['Total Units', 'total_units', v => v || '—'],
+    ['Parking Spaces', 'parking_spaces', v => v || '—'],
+    ['Loss Factor', 'loss_factor', v => v != null ? Number(v).toFixed(1)+'%' : '—'],
+  ];
+
+  // Find best scenario (highest ZFA)
+  let bestIdx = 0;
+  let bestZfa = 0;
+  names.forEach((n, i) => {
+    const zfa = table[n]?.total_zfa || 0;
+    if (zfa > bestZfa) { bestZfa = zfa; bestIdx = i; }
+  });
+
+  metrics.forEach(([label, key, formatter]) => {
+    html += `<tr><td style="font-weight:600;color:var(--grey)">${label}</td>`;
+    names.forEach((n, i) => {
+      const val = table[n]?.[key];
+      const cls = i === bestIdx ? 'num highlight' : 'num';
+      html += `<td class="${cls}">${formatter(val)}</td>`;
+    });
+    html += '</tr>';
+  });
+
+  document.getElementById('comparison-table').innerHTML = html;
+}
+
+function renderParking(layout) {
+  if (!layout || !layout.options || layout.required_spaces === 0) {
+    document.getElementById('parking-card').style.display = 'none';
+    return;
+  }
+
+  document.getElementById('parking-card').style.display = 'block';
+  const feasible = layout.options.filter(o => o.feasible && o.meets_requirement);
+
+  let html = `<p style="font-size:13px;margin-bottom:12px"><b>${layout.required_spaces}</b> spaces required</p>`;
+
+  if (layout.waiver_note) {
+    html += `<p style="font-size:12px;color:var(--orange);margin-bottom:12px">${layout.waiver_note}</p>`;
+  }
+
+  if (feasible.length) {
+    html += '<table class="data-table"><tr><th>Configuration</th><th>Spaces</th><th>Area</th><th>Impact</th><th>Cost</th></tr>';
+    feasible.forEach(o => {
+      const isRec = layout.recommended && layout.recommended.config_type === o.config_type;
+      html += `<tr${isRec?' class="highlight"':''}>`;
+      html += `<td>${configLabel(o.config_type)}${isRec?' <b>(Recommended)</b>':''}</td>`;
+      html += `<td class="num">${o.spaces_provided}</td>`;
+      html += `<td class="num">${fmt(o.area_consumed_sf)} SF</td>`;
+      html += `<td class="num">${fmt(o.impact_on_buildable)} SF</td>`;
+      html += `<td class="num">$${fmt(o.estimated_cost)}</td>`;
+      html += '</tr>';
+    });
+    html += '</table>';
+  } else {
+    html += '<p style="color:var(--red);font-size:13px">No feasible configuration meets the full parking requirement.</p>';
+  }
+
+  document.getElementById('parking-body').innerHTML = html;
+}
+
+function configLabel(type) {
+  const labels = {
+    'surface_lot': 'Surface Lot',
+    'below_grade_1_level': 'Below-Grade (1 Level)',
+    'below_grade_2_levels': 'Below-Grade (2 Levels)',
+    'enclosed_at_grade': 'Enclosed At-Grade',
+    'mechanical_stackers_double': 'Stackers (Double)',
+    'mechanical_stackers_triple': 'Stackers (Triple)',
+    'ramp_to_2nd_floor': 'Ramp to 2nd Floor',
+  };
+  return labels[type] || type.replace(/_/g, ' ');
+}
+
+function openMassingViewer() {
+  const bbl = lastResult?.lot?.bbl;
+  if (!bbl) { alert('No analysis available. Run an analysis first.'); return; }
+  window.open(`/massing-viewer/?bbl=${bbl}`, '_blank');
+}
+
+async function downloadReport() {
+  if (!lastResult || !lastResult.report_path) {
+    alert('No report available. Run an analysis first.');
+    return;
+  }
+  // Extract report ID from path
+  const path = lastResult.report_path;
+  const match = path.match(/_([a-f0-9]{8})\.pdf$/);
+  if (match) {
+    window.open(`${API_BASE}/api/v1/reports/${match[1]}`, '_blank');
+  } else {
+    // Try BBL-based download
+    const bbl = lastResult.lot?.bbl;
+    if (bbl) window.open(`${API_BASE}/api/report/${bbl}/download`, '_blank');
+  }
+}
+</script>
+</body>
+</html>
