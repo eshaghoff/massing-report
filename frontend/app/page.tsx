@@ -1,7 +1,90 @@
 import Link from "next/link";
+import {
+  MapPin,
+  Calculator,
+  ArrowUpFromLine,
+  Maximize,
+  Layers,
+  TableProperties,
+  Box,
+  Home,
+  Car,
+  TrendingUp,
+  FileText,
+  Users,
+  Clock,
+  DollarSign,
+  Building2,
+  CheckCircle2,
+  Zap,
+  Shield,
+} from "lucide-react";
 
 const BRAND_GOLD = "#D4A843";
 const BRAND_NAVY = "#2C5F7C";
+
+const FEATURES = [
+  {
+    icon: MapPin,
+    title: "Zoning District Analysis",
+    desc: "Full zoning district breakdown with overlays and special districts",
+  },
+  {
+    icon: Calculator,
+    title: "FAR Calculations",
+    desc: "Residential, commercial, and community facility FAR with bonuses",
+  },
+  {
+    icon: ArrowUpFromLine,
+    title: "Height & Setback Rules",
+    desc: "Base height, max height, sky exposure plane, and setback requirements",
+  },
+  {
+    icon: Maximize,
+    title: "Lot Coverage & Yards",
+    desc: "Front, rear, and side yard requirements with coverage limits",
+  },
+  {
+    icon: Layers,
+    title: "Development Scenarios",
+    desc: "Multiple building programs: max residential, commercial, and mixed-use",
+  },
+  {
+    icon: TableProperties,
+    title: "Floor-by-Floor Breakdown",
+    desc: "Detailed floor plans with use type, area, and dimensions per level",
+  },
+  {
+    icon: Box,
+    title: "3D Massing Models",
+    desc: "Perspective and plan views with dimensions for each scenario",
+  },
+  {
+    icon: Home,
+    title: "Unit Mix Analysis",
+    desc: "Dwelling unit counts, bedroom configurations, and density calculations",
+  },
+  {
+    icon: Car,
+    title: "Parking Requirements",
+    desc: "Required spaces, waiver eligibility, and City of Yes parking reform",
+  },
+  {
+    icon: TrendingUp,
+    title: "City of Yes Bonuses",
+    desc: "UAP bonus FAR, transit-oriented development, and recent zoning changes",
+  },
+  {
+    icon: FileText,
+    title: "Professional PDF Report",
+    desc: "Downloadable report with maps, diagrams, tables, and full analysis",
+  },
+  {
+    icon: Users,
+    title: "Inclusionary Housing",
+    desc: "Affordable housing bonus FAR and MIH requirements when applicable",
+  },
+];
 
 export default function LandingPage() {
   return (
@@ -16,9 +99,7 @@ export default function LandingPage() {
             >
               MR
             </div>
-            <span className="font-semibold text-gray-900">
-              Massing Report
-            </span>
+            <span className="font-semibold text-gray-900">Massing Report</span>
           </div>
           <div className="flex items-center gap-4">
             <Link
@@ -41,13 +122,16 @@ export default function LandingPage() {
       {/* Hero */}
       <section className="max-w-4xl mx-auto px-6 pt-24 pb-16 text-center">
         <h1 className="text-5xl font-bold text-gray-900 leading-tight">
-          Know What You Can Build
+          In-Depth Zoning Analysis
+          <br />& Due Diligence
           <br />
-          <span style={{ color: BRAND_GOLD }}>Before You Buy</span>
+          <span style={{ color: BRAND_GOLD }}>
+            In Seconds. At a Fraction of the Cost.
+          </span>
         </h1>
         <p className="mt-6 text-xl text-gray-600 max-w-2xl mx-auto">
-          Instant zoning feasibility analysis for any NYC property. Get
-          development scenarios, 3D massing models, and a professional PDF
+          Instant zoning analysis and massing report for any property in NYC.
+          Get development scenarios, 3D massing models, and a professional PDF
           report in seconds.
         </p>
         <div className="mt-10 flex justify-center gap-4">
@@ -56,7 +140,7 @@ export default function LandingPage() {
             className="px-8 py-3 rounded-lg text-white font-semibold text-lg shadow-lg hover:shadow-xl transition"
             style={{ backgroundColor: BRAND_GOLD }}
           >
-            Analyze a Property
+            Select Property
           </Link>
           <Link
             href="#pricing"
@@ -67,75 +151,172 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* How It Works */}
-      <section className="bg-gray-50 py-20">
-        <div className="max-w-5xl mx-auto px-6">
-          <h2 className="text-3xl font-bold text-center text-gray-900 mb-12">
-            How It Works
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {[
-              {
-                step: "1",
-                title: "Enter an Address",
-                desc: "Type any NYC address or BBL number to start your analysis.",
-              },
-              {
-                step: "2",
-                title: "Review the Analysis",
-                desc: "See FAR, lot coverage, height limits, and multiple development scenarios instantly.",
-              },
-              {
-                step: "3",
-                title: "Download Your Report",
-                desc: "Get a professional PDF with 3D massing models, zoning maps, and detailed calculations.",
-              },
-            ].map((item) => (
-              <div
-                key={item.step}
-                className="bg-white rounded-xl p-8 shadow-sm text-center"
-              >
-                <div
-                  className="w-12 h-12 rounded-full flex items-center justify-center text-white text-xl font-bold mx-auto mb-4"
-                  style={{ backgroundColor: BRAND_GOLD }}
-                >
-                  {item.step}
-                </div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                  {item.title}
-                </h3>
-                <p className="text-gray-600">{item.desc}</p>
-              </div>
-            ))}
+      {/* Value Props Banner */}
+      <section className="border-y border-gray-100 bg-gray-50/50">
+        <div className="max-w-5xl mx-auto px-6 py-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-center">
+            <div className="flex flex-col items-center gap-2">
+              <Clock className="w-6 h-6" style={{ color: BRAND_GOLD }} />
+              <span className="font-semibold text-gray-900">
+                Reports in Under 5 Minutes
+              </span>
+              <span className="text-sm text-gray-500">
+                What used to take days now takes seconds
+              </span>
+            </div>
+            <div className="flex flex-col items-center gap-2">
+              <DollarSign className="w-6 h-6" style={{ color: BRAND_GOLD }} />
+              <span className="font-semibold text-gray-900">
+                Fraction of Traditional Cost
+              </span>
+              <span className="text-sm text-gray-500">
+                Save thousands on every deal evaluation
+              </span>
+            </div>
+            <div className="flex flex-col items-center gap-2">
+              <Building2 className="w-6 h-6" style={{ color: BRAND_GOLD }} />
+              <span className="font-semibold text-gray-900">
+                Every NYC Property Covered
+              </span>
+              <span className="text-sm text-gray-500">
+                All five boroughs, every zoning district
+              </span>
+            </div>
           </div>
         </div>
       </section>
 
-      {/* Features */}
+      {/* How It Works — 2 Steps */}
+      <section className="py-20">
+        <div className="max-w-5xl mx-auto px-6">
+          <h2 className="text-3xl font-bold text-center text-gray-900 mb-4">
+            How It Works
+          </h2>
+          <p className="text-center text-gray-500 mb-12">
+            Two steps. No learning curve. No waiting around.
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-10 max-w-4xl mx-auto">
+            {/* Step 1 */}
+            <div className="bg-white rounded-xl p-10 shadow-sm border border-gray-100 text-center">
+              <div
+                className="w-14 h-14 rounded-full flex items-center justify-center text-white text-2xl font-bold mx-auto mb-5"
+                style={{ backgroundColor: BRAND_GOLD }}
+              >
+                1
+              </div>
+              <h3 className="text-xl font-semibold text-gray-900 mb-3">
+                Select Property
+              </h3>
+              <p className="text-gray-600 leading-relaxed">
+                Enter any NYC address or BBL number. Select one or multiple
+                properties to analyze together.
+              </p>
+            </div>
+
+            {/* Step 2 */}
+            <div className="bg-white rounded-xl p-10 shadow-sm border border-gray-100 text-center">
+              <div
+                className="w-14 h-14 rounded-full flex items-center justify-center text-white text-2xl font-bold mx-auto mb-5"
+                style={{ backgroundColor: BRAND_GOLD }}
+              >
+                2
+              </div>
+              <h3 className="text-xl font-semibold text-gray-900 mb-3">
+                Receive Your Report
+              </h3>
+              <p className="text-gray-600 leading-relaxed">
+                Your report will be ready within 5 minutes. See FAR, lot
+                coverage, height limits, and multiple development scenarios
+                instantly. Get a professional PDF with 3D massing models, zoning
+                maps, and detailed calculations.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* What You Get — 12 items */}
+      <section className="bg-gray-50 py-20">
+        <div className="max-w-6xl mx-auto px-6">
+          <h2 className="text-3xl font-bold text-center text-gray-900 mb-4">
+            What You Get
+          </h2>
+          <p className="text-center text-gray-500 mb-12">
+            Everything you need to evaluate a deal — in one report.
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+            {FEATURES.map((f) => {
+              const Icon = f.icon;
+              return (
+                <div
+                  key={f.title}
+                  className="bg-white border border-gray-200 rounded-lg p-5 hover:shadow-md transition group"
+                >
+                  <div
+                    className="w-10 h-10 rounded-lg flex items-center justify-center mb-3 group-hover:scale-110 transition-transform"
+                    style={{ backgroundColor: `${BRAND_NAVY}10` }}
+                  >
+                    <Icon
+                      className="w-5 h-5"
+                      style={{ color: BRAND_NAVY }}
+                    />
+                  </div>
+                  <h3 className="font-semibold text-gray-900 mb-1 text-sm">
+                    {f.title}
+                  </h3>
+                  <p className="text-xs text-gray-500 leading-relaxed">
+                    {f.desc}
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+
+      {/* Who It's For */}
       <section className="py-20">
         <div className="max-w-5xl mx-auto px-6">
           <h2 className="text-3xl font-bold text-center text-gray-900 mb-12">
-            What You Get
+            Built for NYC Real Estate Professionals
           </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {[
-              { title: "Zoning Analysis", desc: "FAR, height, setbacks, lot coverage, yard requirements" },
-              { title: "Development Scenarios", desc: "Max residential, max units, community facility, mixed-use, and more" },
-              { title: "3D Massing Models", desc: "Perspective and plan views with dimensions for each scenario" },
-              { title: "Building Programs", desc: "Floor-by-floor breakdown, core estimates, unit mixes" },
-              { title: "Parking Analysis", desc: "Required spaces, waiver eligibility, layout options" },
-              { title: "City of Yes", desc: "UAP bonus FAR, parking reform, and other recent zoning changes" },
-            ].map((f) => (
-              <div
-                key={f.title}
-                className="border border-gray-200 rounded-lg p-6 hover:shadow-md transition"
-              >
-                <h3 className="font-semibold text-gray-900 mb-2">
-                  {f.title}
-                </h3>
-                <p className="text-sm text-gray-600">{f.desc}</p>
-              </div>
-            ))}
+              {
+                icon: Building2,
+                title: "Developers",
+                desc: "Screen sites faster. Know what you can build before you spend on architects and attorneys.",
+              },
+              {
+                icon: Shield,
+                title: "Brokers & Advisors",
+                desc: "Add real value to every pitch. Share professional zoning reports with clients instantly.",
+              },
+              {
+                icon: Zap,
+                title: "Investors & Lenders",
+                desc: "Due diligence in minutes, not weeks. Evaluate more deals with less overhead.",
+              },
+            ].map((item) => {
+              const Icon = item.icon;
+              return (
+                <div key={item.title} className="text-center">
+                  <div
+                    className="w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-4"
+                    style={{ backgroundColor: `${BRAND_NAVY}12` }}
+                  >
+                    <Icon
+                      className="w-7 h-7"
+                      style={{ color: BRAND_NAVY }}
+                    />
+                  </div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                    {item.title}
+                  </h3>
+                  <p className="text-gray-600">{item.desc}</p>
+                </div>
+              );
+            })}
           </div>
         </div>
       </section>
@@ -164,10 +345,34 @@ export default function LandingPage() {
                 Minimum $50 per report.
               </p>
               <ul className="space-y-2 text-sm text-gray-700 mb-8">
-                <li>&#10003; Full zoning feasibility report</li>
-                <li>&#10003; All development scenarios</li>
-                <li>&#10003; 3D massing models</li>
-                <li>&#10003; Professional PDF download</li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle2
+                    className="w-4 h-4 flex-shrink-0"
+                    style={{ color: BRAND_GOLD }}
+                  />
+                  Full zoning feasibility report
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle2
+                    className="w-4 h-4 flex-shrink-0"
+                    style={{ color: BRAND_GOLD }}
+                  />
+                  All development scenarios
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle2
+                    className="w-4 h-4 flex-shrink-0"
+                    style={{ color: BRAND_GOLD }}
+                  />
+                  3D massing models
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle2
+                    className="w-4 h-4 flex-shrink-0"
+                    style={{ color: BRAND_GOLD }}
+                  />
+                  Professional PDF download
+                </li>
               </ul>
               <Link
                 href="/sign-up"
@@ -199,10 +404,22 @@ export default function LandingPage() {
                 developers and brokers.
               </p>
               <ul className="space-y-2 text-sm text-white/90 mb-8">
-                <li>&#10003; Unlimited zoning reports</li>
-                <li>&#10003; Priority support</li>
-                <li>&#10003; Team seat management</li>
-                <li>&#10003; API access (coming soon)</li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 flex-shrink-0 text-white/80" />
+                  Unlimited zoning reports
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 flex-shrink-0 text-white/80" />
+                  Priority support
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 flex-shrink-0 text-white/80" />
+                  Team seat management
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 flex-shrink-0 text-white/80" />
+                  API access (coming soon)
+                </li>
               </ul>
               <Link
                 href="/sign-up"
