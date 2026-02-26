@@ -14,7 +14,10 @@ export default async function middleware(req: NextRequest) {
   const { clerkMiddleware, createRouteMatcher } = await import(
     "@clerk/nextjs/server"
   );
-  const isProtectedRoute = createRouteMatcher(["/dashboard(.*)"]);
+  const isProtectedRoute = createRouteMatcher([
+    "/dashboard(.*)",
+    "/checkout(.*)",
+  ]);
   const handler = clerkMiddleware(async (auth, request) => {
     if (isProtectedRoute(request)) {
       await auth.protect();

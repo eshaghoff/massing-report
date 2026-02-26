@@ -10,7 +10,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from pydantic import BaseModel
 
-from app.api.auth import get_current_user, UserInfo
+from app.api.auth import get_current_user, get_optional_user, UserInfo
 from app.services.pricing import calculate_price
 from app.config import settings
 
@@ -143,7 +143,7 @@ async def _run_analysis(address: str = None, bbl: str = None):
 
 # ── POST /preview ──
 @router.post("/preview")
-async def preview_report(req: PreviewRequest, user: UserInfo = Depends(get_current_user)):
+async def preview_report(req: PreviewRequest, user: UserInfo | None = Depends(get_optional_user)):
     """Run zoning analysis (no PDF) and return summary + price quote."""
     analysis = await _run_analysis(address=req.address, bbl=req.bbl)
 
@@ -178,7 +178,7 @@ async def preview_report(req: PreviewRequest, user: UserInfo = Depends(get_curre
         "analysis": analysis,
         "pricing": pricing,
         "created_at": datetime.now(timezone.utc).isoformat(),
-        "user_id": user.clerk_user_id,
+        "user_id": user.clerk_user_id if user else "anonymous",
     }
 
     resolved_address = lot.address or req.address or req.bbl or ""
@@ -219,7 +219,7 @@ async def generate_report_endpoint(
     # Create report record
     _reports[report_id] = {
         "id": report_id,
-        "user_id": user.clerk_user_id,
+        "user_id": user.clerk_user_id if user else "anonymous",
         "bbl": "",
         "address": req.address or req.bbl or "",
         "status": "processing",
@@ -245,7 +245,7 @@ async def _generate_report_task(report_id: str, req: GenerateRequest, user: User
         analysis = None
         if req.preview_id and req.preview_id in _preview_cache:
             cached = _preview_cache[req.preview_id]
-            if cached["user_id"] == user.clerk_user_id:
+            if cached["user_id"] == user.clerk_user_id or cached["user_id"] == "anonymous":
                 analysis = cached["analysis"]
 
         if analysis is None:

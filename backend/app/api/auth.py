@@ -120,3 +120,52 @@ async def get_current_user(
         raise HTTPException(401, f"Invalid token: {e}")
     except Exception as e:
         raise HTTPException(401, f"Authentication failed: {e}")
+
+
+async def get_optional_user(
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
+) -> Optional[UserInfo]:
+    """Like get_current_user but returns None instead of 401 if no token."""
+    if _DEV_MODE:
+        return UserInfo(
+            clerk_user_id="dev_user_001",
+            email="dev@localhost",
+            first_name="Dev",
+            last_name="User",
+        )
+
+    if not credentials:
+        return None
+
+    try:
+        jwks = await _get_jwks()
+        unverified_header = jwt.get_unverified_header(credentials.credentials)
+        kid = unverified_header.get("kid")
+
+        key_data = None
+        for k in jwks:
+            if k.get("kid") == kid:
+                key_data = k
+                break
+
+        if not key_data:
+            return None
+
+        public_key = jwt.algorithms.RSAAlgorithm.from_jwk(key_data)
+
+        payload = jwt.decode(
+            credentials.credentials,
+            public_key,
+            algorithms=["RS256"],
+            issuer=f"https://{settings.clerk_domain}",
+            options={"verify_aud": False},
+        )
+
+        return UserInfo(
+            clerk_user_id=payload.get("sub", ""),
+            email=payload.get("email", ""),
+            first_name=payload.get("first_name", ""),
+            last_name=payload.get("last_name", ""),
+        )
+    except Exception:
+        return None
