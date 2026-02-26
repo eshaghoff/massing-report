@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 const BRAND_GOLD = "#D4A843";
+const BRAND_NAVY = "#2C5F7C";
 
 export default function LandingPage() {
   return (
@@ -10,13 +11,13 @@ export default function LandingPage() {
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div
-              className="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-bold"
-              style={{ backgroundColor: BRAND_GOLD }}
+              className="w-8 h-8 rounded-lg flex items-center justify-center text-white text-sm font-bold"
+              style={{ backgroundColor: BRAND_NAVY }}
             >
-              WE
+              MR
             </div>
             <span className="font-semibold text-gray-900">
-              West Egg Development
+              Massing Report
             </span>
           </div>
           <div className="flex items-center gap-4">
@@ -180,7 +181,7 @@ export default function LandingPage() {
             {/* Annual */}
             <div
               className="rounded-xl p-8 shadow-lg text-white relative"
-              style={{ backgroundColor: "#2C5F7C" }}
+              style={{ backgroundColor: BRAND_NAVY }}
             >
               <div
                 className="absolute -top-3 right-6 px-3 py-1 rounded-full text-xs font-bold text-white"
@@ -218,8 +219,8 @@ export default function LandingPage() {
       {/* Footer */}
       <footer className="border-t border-gray-100 py-8">
         <div className="max-w-6xl mx-auto px-6 text-center text-sm text-gray-500">
-          &copy; {new Date().getFullYear()} West Egg Development. All rights
-          reserved.
+          &copy; {new Date().getFullYear()} Massing Report by West Egg
+          Development. All rights reserved.
         </div>
       </footer>
     </div>

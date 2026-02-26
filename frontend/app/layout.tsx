@@ -8,9 +8,17 @@ const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "West Egg Development | NYC Zoning Feasibility",
+  title: "Massing Report | NYC Zoning Feasibility Analysis",
   description:
-    "Instant zoning feasibility analysis for any NYC property. Know what you can build before you buy.",
+    "Instant zoning feasibility analysis for any NYC property. Get development scenarios, 3D massing models, and professional PDF reports in seconds.",
+  openGraph: {
+    title: "Massing Report | Know What You Can Build Before You Buy",
+    description:
+      "Instant zoning feasibility analysis for any NYC property.",
+    url: "https://massingreport.com",
+    siteName: "Massing Report",
+    type: "website",
+  },
 };
 
 export default function RootLayout({

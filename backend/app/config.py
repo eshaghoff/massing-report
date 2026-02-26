@@ -11,7 +11,13 @@ class Settings(BaseSettings):
     nyc_geoclient_app_key: str = ""
     google_maps_api_key: str = ""
     socrata_app_token: str = ""
-    cors_origins: list[str] = ["http://localhost:3000", "http://localhost:5173", "http://100.67.179.5:3000"]
+    cors_origins: list[str] = [
+        "http://localhost:3000",
+        "http://localhost:5173",
+        "http://100.67.179.5:3000",
+        "https://massingreport.com",
+        "https://www.massingreport.com",
+    ]
 
     # Clerk auth
     clerk_domain: str = ""  # e.g. "your-app.clerk.accounts.dev"
@@ -25,7 +31,7 @@ class Settings(BaseSettings):
     stripe_annual_price_id: str = ""  # Stripe Price ID for $10K/year plan
 
     # Frontend URL (for Stripe redirect URLs)
-    frontend_url: str = "http://localhost:3000"
+    frontend_url: str = "https://massingreport.com"
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 
