@@ -17,6 +17,8 @@ class Settings(BaseSettings):
         "http://100.67.179.5:3000",
         "https://massingreport.com",
         "https://www.massingreport.com",
+        "https://massing-report.vercel.app",
+        "https://massing-report-eae2jv83a-eshaghoffs-projects.vercel.app",
     ]
 
     # Clerk auth
