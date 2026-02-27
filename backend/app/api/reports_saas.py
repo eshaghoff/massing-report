@@ -23,10 +23,10 @@ from app.services.street_width import determine_street_width
 from app.services.maps import (
     fetch_satellite_image, fetch_street_map_image,
     fetch_zoning_map_image, fetch_context_map_image,
-    fetch_city_overview_map, fetch_neighbourhood_map_image,
+    fetch_city_overview_map, fetch_neighborhood_map_image,
     fetch_street_view_image,
 )
-from app.services.geocoding import fetch_neighbourhood, fetch_cross_streets
+from app.services.geocoding import fetch_neighborhood, fetch_cross_streets
 from app.zoning_engine.calculator import ZoningCalculator
 from app.zoning_engine.massing import compute_massing_geometry
 from app.zoning_engine.massing_builder import build_massing_model
@@ -86,7 +86,7 @@ async def _run_analysis(address: str = None, bbl: str = None):
         parsed = parse_bbl(bbl)
         if not parsed:
             raise HTTPException(status_code=400, detail=f"Invalid BBL: {bbl}")
-        # Try geocoding the BBL to get coordinates + neighbourhood
+        # Try geocoding the BBL to get coordinates + neighborhood
         try:
             bbl_result = await geocode_address(parsed)
         except Exception:
@@ -118,12 +118,12 @@ async def _run_analysis(address: str = None, bbl: str = None):
 
     lot_profile = await _build_lot_profile(bbl_result, pluto, geometry, zoning_layers)
 
-    # Populate neighbourhood from geocode result or dedicated lookup
-    if hasattr(bbl_result, 'neighbourhood') and bbl_result.neighbourhood:
-        lot_profile.neighbourhood = bbl_result.neighbourhood
+    # Populate neighborhood from geocode result or dedicated lookup
+    if hasattr(bbl_result, 'neighborhood') and bbl_result.neighborhood:
+        lot_profile.neighborhood = bbl_result.neighborhood
     elif lot_profile.address:
         try:
-            lot_profile.neighbourhood = await fetch_neighbourhood(lot_profile.address)
+            lot_profile.neighborhood = await fetch_neighborhood(lot_profile.address)
         except Exception:
             pass
 
@@ -341,7 +341,7 @@ async def _generate_report_task(report_id: str, req: GenerateRequest, user: User
                 fetch_zoning_map_image(lat, lng, lot_geom),
                 fetch_context_map_image(lat, lng, lot_geom),
                 fetch_city_overview_map(lat, lng),
-                fetch_neighbourhood_map_image(lat, lng, lot_geom),
+                fetch_neighborhood_map_image(lat, lng, lot_geom),
                 fetch_street_view_image(lat, lng),
                 fetch_block_description(lot_profile.bbl),
             )
@@ -352,7 +352,7 @@ async def _generate_report_task(report_id: str, req: GenerateRequest, user: User
                     "zoning_map_bytes": zmap,
                     "context_map_bytes": ctx,
                     "city_overview_bytes": city,
-                    "neighbourhood_map_bytes": nbhd,
+                    "neighborhood_map_bytes": nbhd,
                     "street_view_bytes": sv,
                 }
             # Set block description on lot profile

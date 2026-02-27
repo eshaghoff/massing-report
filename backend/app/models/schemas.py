@@ -15,7 +15,7 @@ class BBLResponse(BaseModel):
     lot: int
     latitude: Optional[float] = None
     longitude: Optional[float] = None
-    neighbourhood: Optional[str] = None
+    neighborhood: Optional[str] = None
 
 
 class PlutoData(BaseModel):
@@ -81,7 +81,7 @@ class LotProfile(BaseModel):
     is_historic_district: bool = False
     flood_zone: Optional[str] = None
     coastal_zone: bool = False
-    neighbourhood: Optional[str] = None
+    neighborhood: Optional[str] = None
     cross_streets: Optional[str] = None
     block_description: Optional[str] = None
 

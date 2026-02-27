@@ -749,7 +749,7 @@ async def fetch_context_map_image(
     """Fetch a zoomed-out context map showing roughly half of NYC.
 
     Uses a wide bounding box (~3 miles / ~15,000 ft radius) so the
-    viewer can see the property's neighbourhood context within the borough.
+    viewer can see the property's neighborhood context within the borough.
     """
     try:
         from PIL import Image, ImageDraw
@@ -918,29 +918,29 @@ def _make_bbox_square(bbox: tuple[float, float, float, float]) -> tuple[float, f
 # NEIGHBOURHOOD MAP
 # ──────────────────────────────────────────────────────────────────
 
-async def fetch_neighbourhood_map_image(
+async def fetch_neighborhood_map_image(
     lat: float,
     lng: float,
     geometry: dict | None = None,
     width: int = 800,
     height: int = 600,
 ) -> bytes | None:
-    """Fetch a neighbourhood-level map (~0.75 mile radius) with subject property marker.
+    """Fetch a neighborhood-level map (~0.75 mile radius) with subject property marker.
 
-    Uses ESRI Street Map at ~4000ft radius for neighbourhood context — wider than
+    Uses ESRI Street Map at ~4000ft radius for neighborhood context — wider than
     the close-up street map but tighter than the city overview.
     """
     try:
         from PIL import Image, ImageDraw, ImageFont
     except ImportError:
-        logger.warning("Pillow not installed — cannot create neighbourhood map")
+        logger.warning("Pillow not installed — cannot create neighborhood map")
         return None
 
-    # ~4000ft radius ~ 0.75 mile — good neighbourhood context
+    # ~4000ft radius ~ 0.75 mile — good neighborhood context
     bbox = compute_bbox_from_latlng(lat, lng, radius_ft=4000)
     minx, miny, maxx, maxy = bbox
 
-    # Fetch base street map at neighbourhood scale
+    # Fetch base street map at neighborhood scale
     base_img = await _fetch_esri_image(ESRI_STREET_URL, bbox, width, height)
     if not base_img:
         return None

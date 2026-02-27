@@ -290,8 +290,8 @@ async def _geocode_geosearch(address: str) -> BBLResponse | None:
     lat = coords[1] if len(coords) >= 2 and coords[1] else None
     lng = coords[0] if len(coords) >= 2 and coords[0] else None
 
-    # Extract neighbourhood from Geosearch response
-    neighbourhood = props.get("neighbourhood") or props.get("neighborhood") or None
+    # Extract neighborhood from Geosearch response
+    neighborhood = props.get("neighbourhood") or props.get("neighborhood") or None
 
     return BBLResponse(
         bbl=bbl,
@@ -300,7 +300,7 @@ async def _geocode_geosearch(address: str) -> BBLResponse | None:
         lot=int(bbl[6:10]),
         latitude=lat,
         longitude=lng,
-        neighbourhood=neighbourhood,
+        neighborhood=neighborhood,
     )
 
 
@@ -391,8 +391,8 @@ async def _geocode_geoservice_1a(
 # NEIGHBOURHOOD & CROSS-STREET HELPERS
 # ──────────────────────────────────────────────────────────────────
 
-async def fetch_neighbourhood(address: str) -> str | None:
-    """Look up neighbourhood name via Geosearch API."""
+async def fetch_neighborhood(address: str) -> str | None:
+    """Look up neighborhood name via Geosearch API."""
     try:
         url = "https://geosearch.planninglabs.nyc/v2/search"
         params = {"text": address}

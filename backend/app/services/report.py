@@ -463,7 +463,7 @@ def _build_cover_page(story, styles, lot, env, report_id, map_images=None):
                              spaceAfter=14))
 
     # ── Horizontal info bar — key facts in one row ──
-    neighbourhood = getattr(lot, 'neighbourhood', None) or ""
+    neighborhood = getattr(lot, 'neighborhood', None) or ""
     zoning = ", ".join(lot.zoning_districts) if lot.zoning_districts else "N/A"
     lot_area = f"{lot.lot_area:,.0f} SF" if lot.lot_area else "N/A"
 
@@ -479,9 +479,9 @@ def _build_cover_page(story, styles, lot, env, report_id, map_images=None):
          Paragraph(lot_area, info_bold), Paragraph(_borough_name(lot.borough), info_bold)],
     ]
 
-    if neighbourhood:
+    if neighborhood:
         info_cells[0].append(Paragraph("Neighborhood", info_style))
-        info_cells[1].append(Paragraph(neighbourhood, info_bold))
+        info_cells[1].append(Paragraph(neighborhood, info_bold))
 
     ncols = len(info_cells[0])
     col_w = CONTENT_W / ncols
@@ -535,36 +535,36 @@ def _build_cover_page(story, styles, lot, env, report_id, map_images=None):
 # ──────────────────────────────────────────────────────────────────
 
 def _build_property_maps(story, styles, lot, map_images):
-    """Section 2: Property Location — neighbourhood context, maps, block character.
+    """Section 2: Property Location — neighborhood context, maps, block character.
 
     Layout:
       - Section header
-      - Neighbourhood name (subtitle)
+      - Neighborhood name (subtitle)
       - Cross streets, lot type, street width line
-      - 2x2 map grid: city overview + neighbourhood (top), close-up + street view (bottom)
+      - 2x2 map grid: city overview + neighborhood (top), close-up + street view (bottom)
       - Block character description paragraph
     """
     has_street = map_images and map_images.get("street_bytes")
     has_city = map_images and map_images.get("city_overview_bytes")
     has_context = map_images and map_images.get("context_map_bytes")
-    has_neighbourhood = map_images and map_images.get("neighbourhood_map_bytes")
+    has_neighborhood = map_images and map_images.get("neighborhood_map_bytes")
     has_street_view = map_images and map_images.get("street_view_bytes")
     has_geometry = lot.geometry is not None
     block_desc = getattr(lot, 'block_description', None) or ""
 
     if (not has_street and not has_city and not has_context
-            and not has_neighbourhood and not has_geometry):
+            and not has_neighborhood and not has_geometry):
         return
 
     story.append(_section_header("Property Location", section_num=2, styles=styles))
     story.append(Spacer(1, 8))
 
-    # ── Neighbourhood name (subtitle) ──
-    neighbourhood = getattr(lot, 'neighbourhood', None) or ""
-    if neighbourhood:
+    # ── Neighborhood name (subtitle) ──
+    neighborhood = getattr(lot, 'neighborhood', None) or ""
+    if neighborhood:
         story.append(Paragraph(
-            neighbourhood,
-            ParagraphStyle('NeighbourhoodTitle', fontSize=16, fontName='Helvetica-Bold',
+            neighborhood,
+            ParagraphStyle('NeighborhoodTitle', fontSize=16, fontName='Helvetica-Bold',
                            textColor=BLUE, leading=20, spaceAfter=4),
         ))
 
@@ -617,16 +617,16 @@ def _build_property_maps(story, styles, lot, map_images):
         except Exception:
             return None
 
-    # Top row: City overview (left) + Neighbourhood map (right)
+    # Top row: City overview (left) + Neighborhood map (right)
     top_left = _map_cell(
         "NYC Overview",
         map_images.get("city_overview_bytes") if map_images else None,
         "Red marker indicates subject property. Source: ESRI.",
     )
     top_right = _map_cell(
-        "Neighbourhood",
-        map_images.get("neighbourhood_map_bytes") if map_images else None,
-        "Neighbourhood context (~0.75 mi radius). Source: ESRI.",
+        "Neighborhood",
+        map_images.get("neighborhood_map_bytes") if map_images else None,
+        "Neighborhood context (~0.75 mi radius). Source: ESRI.",
         fallback_bytes=map_images.get("context_map_bytes") if map_images else None,
     )
 
@@ -1093,11 +1093,11 @@ def _build_zoning_overview(story, styles, lot, env, map_images=None):
     elif env.height_factor:
         hs_data.append(["Program", "Height Factor (Non-Contextual)"])
     if env.base_height_min is not None:
-        hs_data.append(["Min Base Height", f"{env.base_height_min} ft"])
+        hs_data.append(["Min Base Height", f"{env.base_height_min:.0f} ft"])
     if env.base_height_max is not None:
-        hs_data.append(["Max Base Height", f"{env.base_height_max} ft"])
+        hs_data.append(["Max Base Height", f"{env.base_height_max:.0f} ft"])
     if env.max_building_height is not None:
-        hs_data.append(["Max Bldg Height", f"{env.max_building_height} ft"])
+        hs_data.append(["Max Bldg Height", f"{env.max_building_height:.0f} ft"])
     elif env.height_factor:
         hs_data.append(["Max Bldg Height", "No cap (SEP applies)"])
     hs_data.append(["Rear Yard", f"{env.rear_yard} ft"])
@@ -1107,7 +1107,7 @@ def _build_zoning_overview(story, styles, lot, env, map_images=None):
                      f"Required ({env.side_yard_width}' each)" if env.side_yards_required
                      else "Not required"])
     if env.lot_coverage_max is not None:
-        hs_data.append(["Lot Coverage", f"{env.lot_coverage_max}%"])
+        hs_data.append(["Lot Coverage", f"{env.lot_coverage_max:.0f}%"])
     if env.sky_exposure_plane:
         hs_data.append(["Sky Exposure Plane",
             f"Starts {env.sky_exposure_plane.start_height}', "
@@ -1247,7 +1247,7 @@ def _build_calculation_breakdown(story, styles, lot, env):
         lot_calc.append(["Buildable FP", f"{buildable:,.0f} SF"])
         if env.lot_coverage_max:
             lot_calc.append(["Max Coverage",
-                             f"{env.lot_coverage_max}% = {lot_area * env.lot_coverage_max / 100:,.0f} SF"])
+                             f"{env.lot_coverage_max:.0f}% = {lot_area * env.lot_coverage_max / 100:,.0f} SF"])
     left_parts.append(_make_kv_table(lot_calc, col_widths=calc_kv))
 
     # 6b. FAR Calculation
@@ -1306,11 +1306,11 @@ def _build_calculation_breakdown(story, styles, lot, env):
         typical_fl = 10
         if env.base_height_min is not None and env.base_height_max is not None:
             height_calc.append(["Base Ht Range",
-                                f"{env.base_height_min}\u2013{env.base_height_max}'"])
+                                f"{env.base_height_min:.0f}\u2013{env.base_height_max:.0f}'"])
             base_floors = 1 + max(0, int((env.base_height_max - ground_fl) / typical_fl))
             height_calc.append(["Base Floors", f"{base_floors}"])
         if env.max_building_height is not None:
-            height_calc.append(["Max Height", f"{env.max_building_height}'"])
+            height_calc.append(["Max Height", f"{env.max_building_height:.0f}'"])
             if env.base_height_max:
                 sb_fl = max(0, int((env.max_building_height - env.base_height_max) / typical_fl))
                 height_calc.append(["Setback Floors", f"{sb_fl}"])
@@ -1324,7 +1324,7 @@ def _build_calculation_breakdown(story, styles, lot, env):
             height_calc.append(["SEP Ratio", f"{sep.ratio}:1"])
     else:
         if env.max_building_height is not None:
-            height_calc.append(["Max Height", f"{env.max_building_height}'"])
+            height_calc.append(["Max Height", f"{env.max_building_height:.0f}'"])
     if height_calc:
         right_parts.append(_make_kv_table(height_calc, col_widths=calc_kv))
 
