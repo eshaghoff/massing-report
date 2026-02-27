@@ -6,14 +6,14 @@ Sections:
   1.  Cover Page (with Massing Report branding + satellite thumbnail)
   2.  Property Maps (satellite + street)
   3.  Site Summary (two-column layout)
-  4.  Key Development Features (highlighted callout cards)
+  4.  Development Characteristics (highlighted callout cards)
   5.  Zoning Overview (with zoning map)
-  6.  Detailed Calculations (FAR, units, height breakdowns)
-  7.  Development Scenarios (with 3D massing, highlight badges, analyst manifest)
+  6.  Calculation Detail (FAR, units, height breakdowns)
+  7.  Development Scenarios (investment case studies with key metrics)
   8.  Scenario Comparison Table
   9.  Parking Analysis
   10. Assemblage Analysis (if applicable)
-  11. Notes & Disclaimers
+  11. Disclaimers & Limitations
 """
 
 from __future__ import annotations
@@ -41,25 +41,26 @@ logger = logging.getLogger(__name__)
 
 OUTPUT_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "output")
 
-# ── Brand Colors (matching frontend Massing Report identity) ──
-BLUE = colors.HexColor('#2C5F7C')           # Brand Navy (primary)
-BLUE_DARK = colors.HexColor('#1E4A5E')      # Brand Navy Dark (headers)
-DARK = colors.HexColor('#1a1a2e')            # Text
-GREY = colors.HexColor('#666666')            # Secondary text
-LIGHT_BG = colors.HexColor('#f0f4f8')        # Light backgrounds
-GRID_COLOR = colors.HexColor('#e0e0e0')      # Table grids
-GREEN_BG = colors.HexColor('#e8f4e8')        # Highlighted scenarios
-HIGHLIGHT_BORDER = colors.HexColor('#2C5F7C')  # Accent borders
-FEATURE_BG = colors.HexColor('#f7f9fc')      # Feature card backgrounds
-GOLD = colors.HexColor('#D4A843')            # Brand Gold (accents)
-GOLD_LIGHT = colors.HexColor('#FDF6E3')      # Light gold backgrounds
-BADGE_BLUE = colors.HexColor('#E3EEF3')      # Navy-tinted badge backgrounds
-BADGE_GREEN = colors.HexColor('#E6F4EA')     # Green badge backgrounds
+# ── Institutional Palette (charcoal / off-white / deep blue / muted gold) ──
+BLUE = colors.HexColor('#1C3D5A')           # Deep blue (primary)
+BLUE_DARK = colors.HexColor('#152D42')      # Darker blue (headers)
+DARK = colors.HexColor('#2D2D2D')            # Charcoal text
+GREY = colors.HexColor('#7A7A7A')            # Secondary text
+LIGHT_BG = colors.HexColor('#F7F6F3')        # Off-white / warm grey
+GRID_COLOR = colors.HexColor('#DCDAD5')      # Subtle warm dividers
+GREEN_BG = colors.HexColor('#EDF3ED')        # Muted green highlight
+HIGHLIGHT_BORDER = colors.HexColor('#1C3D5A')  # Accent borders
+FEATURE_BG = colors.HexColor('#F5F4F1')      # Warm off-white cards
+GOLD = colors.HexColor('#B8976A')            # Muted gold accent
+GOLD_LIGHT = colors.HexColor('#F5F0E8')      # Light warm tone
+BADGE_BLUE = colors.HexColor('#E8EDF2')      # Cool badge bg
+BADGE_GREEN = colors.HexColor('#E8F0E8')     # Muted green badge
 WHITE = colors.white
+OFF_WHITE = colors.HexColor('#FAFAF8')       # Paper-white
 
 PAGE_W, PAGE_H = letter
-MARGIN = 0.75 * inch
-CONTENT_W = PAGE_W - 2 * MARGIN  # ~504 pt ≈ 7 inches
+MARGIN = 0.85 * inch
+CONTENT_W = PAGE_W - 2 * MARGIN  # ~490 pt ≈ 6.8 inches
 
 
 # ──────────────────────────────────────────────────────────────────
@@ -67,17 +68,17 @@ CONTENT_W = PAGE_W - 2 * MARGIN  # ~504 pt ≈ 7 inches
 # ──────────────────────────────────────────────────────────────────
 
 def _draw_logo(canvas, x, y, size="small"):
-    """Draw the Massing Report logo on the canvas.
+    """Draw the Massing Report logo on the canvas — refined minimal.
 
     *x, y* is the left-centre of the gold circle.
     """
     canvas.saveState()
     if size == "large":
-        r, fs, ls, gap = 18, 14, 16, 24
+        r, fs, ls, gap = 16, 12, 13, 20
     else:
-        r, fs, ls, gap = 10, 8, 9, 14
+        r, fs, ls, gap = 9, 7, 8.5, 12
 
-    # Gold circle
+    # Muted gold circle
     canvas.setFillColor(GOLD)
     canvas.circle(x + r, y, r, fill=1, stroke=0)
 
@@ -86,46 +87,46 @@ def _draw_logo(canvas, x, y, size="small"):
     canvas.setFont('Helvetica-Bold', fs)
     canvas.drawCentredString(x + r, y - fs * 0.35, "MR")
 
-    # Company name
+    # Company name — refined spacing
     canvas.setFillColor(DARK)
-    canvas.setFont('Helvetica-Bold', ls)
-    canvas.drawString(x + r * 2 + gap * 0.4, y - ls * 0.35, "MASSING REPORT")
+    canvas.setFont('Helvetica', ls)
+    canvas.drawString(x + r * 2 + gap * 0.5, y - ls * 0.35, "MASSING REPORT")
     canvas.restoreState()
 
 
 def _header_footer_first(canvas, doc):
-    """Cover page — logo + gold rule; no page number."""
+    """Cover page — logo + thin rule; no page number."""
     canvas.saveState()
     _draw_logo(canvas, doc.leftMargin, PAGE_H - 38, size="small")
-    canvas.setStrokeColor(GOLD)
-    canvas.setLineWidth(1.5)
+    canvas.setStrokeColor(GRID_COLOR)
+    canvas.setLineWidth(0.5)
     canvas.line(doc.leftMargin, PAGE_H - 52, PAGE_W - doc.rightMargin, PAGE_H - 52)
     canvas.restoreState()
 
 
 def _header_footer_later(canvas, doc):
-    """Subsequent pages — logo left, report title right, page number footer."""
+    """Subsequent pages — minimal header and footer."""
     canvas.saveState()
 
-    # ── Header ──
+    # ── Header — thin single rule ──
     _draw_logo(canvas, doc.leftMargin, PAGE_H - 38, size="small")
     canvas.setFillColor(GREY)
-    canvas.setFont('Helvetica', 8)
+    canvas.setFont('Helvetica', 7.5)
     canvas.drawRightString(PAGE_W - doc.rightMargin, PAGE_H - 41,
                            "Zoning Feasibility Analysis")
-    canvas.setStrokeColor(BLUE_DARK)
-    canvas.setLineWidth(1)
-    canvas.line(doc.leftMargin, PAGE_H - 52, PAGE_W - doc.rightMargin, PAGE_H - 52)
-
-    # ── Footer ──
     canvas.setStrokeColor(GRID_COLOR)
     canvas.setLineWidth(0.5)
-    canvas.line(doc.leftMargin, 42, PAGE_W - doc.rightMargin, 42)
-    canvas.setFillColor(GREY)
-    canvas.setFont('Helvetica', 8)
-    canvas.drawCentredString(PAGE_W / 2, 28, f"Page {doc.page}")
-    canvas.drawRightString(PAGE_W - doc.rightMargin, 28,
-                           datetime.now().strftime('%B %d, %Y'))
+    canvas.line(doc.leftMargin, PAGE_H - 52, PAGE_W - doc.rightMargin, PAGE_H - 52)
+
+    # ── Footer — light grey, minimal ──
+    canvas.setStrokeColor(GRID_COLOR)
+    canvas.setLineWidth(0.25)
+    canvas.line(doc.leftMargin, 40, PAGE_W - doc.rightMargin, 40)
+    canvas.setFillColor(colors.HexColor('#AAAAAA'))
+    canvas.setFont('Helvetica', 7)
+    canvas.drawString(doc.leftMargin, 28,
+                      datetime.now().strftime('%B %d, %Y'))
+    canvas.drawRightString(PAGE_W - doc.rightMargin, 28, f"{doc.page}")
     canvas.restoreState()
 
 
@@ -134,59 +135,73 @@ def _header_footer_later(canvas, doc):
 # ──────────────────────────────────────────────────────────────────
 
 def _get_styles():
-    """Build all report paragraph styles."""
+    """Build all report paragraph styles — institutional typography."""
     styles = getSampleStyleSheet()
     styles.add(ParagraphStyle(
-        name='ReportTitle', fontSize=26, fontName='Helvetica-Bold',
+        name='ReportTitle', fontSize=30, fontName='Helvetica-Bold',
         spaceAfter=6, textColor=DARK, alignment=TA_CENTER,
+        leading=36,
     ))
     styles.add(ParagraphStyle(
-        name='Subtitle', fontSize=12, fontName='Helvetica',
-        alignment=TA_CENTER, textColor=GREY,
+        name='Subtitle', fontSize=11, fontName='Helvetica',
+        alignment=TA_CENTER, textColor=GREY, leading=14,
     ))
     styles.add(ParagraphStyle(
-        name='SectionTitle', fontSize=14, fontName='Helvetica-Bold',
-        spaceAfter=8, spaceBefore=16, textColor=BLUE,
+        name='SectionTitle', fontSize=18, fontName='Helvetica-Bold',
+        spaceAfter=10, spaceBefore=20, textColor=DARK,
     ))
     styles.add(ParagraphStyle(
-        name='SectionHeaderWhite', fontSize=13, fontName='Helvetica-Bold',
-        textColor=WHITE, leading=18,
+        name='SectionHeaderWhite', fontSize=18, fontName='Helvetica-Bold',
+        textColor=DARK, leading=24,
     ))
     styles.add(ParagraphStyle(
         name='SubSection', fontSize=11, fontName='Helvetica-Bold',
-        spaceAfter=4, spaceBefore=8,
+        spaceAfter=5, spaceBefore=10, textColor=DARK,
     ))
     styles.add(ParagraphStyle(
-        name='Body', fontSize=10, fontName='Helvetica',
-        spaceAfter=3, leading=13,
+        name='Body', fontSize=10.5, fontName='Helvetica',
+        spaceAfter=5, leading=15, textColor=DARK,
     ))
     styles.add(ParagraphStyle(
-        name='SmallBody', fontSize=9, fontName='Helvetica',
-        spaceAfter=2, leading=11,
+        name='SmallBody', fontSize=9.5, fontName='Helvetica',
+        spaceAfter=3, leading=13, textColor=DARK,
     ))
     styles.add(ParagraphStyle(
-        name='Disclaimer', fontSize=8, fontName='Helvetica-Oblique',
-        textColor=GREY, alignment=TA_CENTER, leading=10,
+        name='Disclaimer', fontSize=7.5, fontName='Helvetica',
+        textColor=colors.HexColor('#999999'), alignment=TA_CENTER, leading=10,
     ))
     styles.add(ParagraphStyle(
-        name='NoteText', fontSize=8, fontName='Helvetica-Oblique',
-        textColor=GREY, spaceAfter=2, leading=10,
+        name='NoteText', fontSize=8, fontName='Helvetica',
+        textColor=GREY, spaceAfter=3, leading=11,
     ))
     styles.add(ParagraphStyle(
         name='CalloutLabel', fontSize=9, fontName='Helvetica-Bold',
-        textColor=DARK, spaceAfter=1, leading=11,
+        textColor=DARK, spaceAfter=1, leading=12,
     ))
     styles.add(ParagraphStyle(
         name='CalloutValue', fontSize=9, fontName='Helvetica',
-        textColor=GREY, spaceAfter=2, leading=11,
+        textColor=GREY, spaceAfter=2, leading=12,
     ))
     styles.add(ParagraphStyle(
-        name='BigNumber', fontSize=18, fontName='Helvetica-Bold',
-        textColor=BLUE, alignment=TA_CENTER, spaceAfter=4,
+        name='BigNumber', fontSize=26, fontName='Helvetica-Bold',
+        textColor=BLUE, alignment=TA_CENTER, spaceAfter=2, leading=30,
     ))
     styles.add(ParagraphStyle(
-        name='SubSectionItalic', fontSize=10, fontName='Helvetica-BoldOblique',
-        spaceAfter=3, spaceBefore=4, textColor=BLUE_DARK,
+        name='SubSectionItalic', fontSize=10, fontName='Helvetica',
+        spaceAfter=4, spaceBefore=6, textColor=GREY,
+    ))
+    # New styles for institutional design
+    styles.add(ParagraphStyle(
+        name='MetricNumber', fontSize=24, fontName='Helvetica-Bold',
+        textColor=BLUE, alignment=TA_CENTER, leading=28, spaceAfter=0,
+    ))
+    styles.add(ParagraphStyle(
+        name='MetricLabel', fontSize=8, fontName='Helvetica',
+        textColor=GREY, alignment=TA_CENTER, leading=10, spaceAfter=0,
+    ))
+    styles.add(ParagraphStyle(
+        name='ExecutiveSummary', fontSize=10, fontName='Helvetica-Oblique',
+        textColor=GREY, leading=14, spaceAfter=6, spaceBefore=4,
     ))
     return styles
 
@@ -196,64 +211,77 @@ def _get_styles():
 # ──────────────────────────────────────────────────────────────────
 
 def _section_header(text, section_num=None, styles=None):
-    """Colored section header bar — white text on blue-dark background."""
-    label = f"{section_num}. {text}" if section_num else text
+    """Section header — thin rule beneath, no heavy bar. Architectural minimal."""
+    label = text  # Drop numbering for cleaner look
     sty = (styles or {}).get('SectionHeaderWhite') or ParagraphStyle(
-        'SHW', fontSize=13, fontName='Helvetica-Bold', textColor=WHITE, leading=18,
+        'SHW', fontSize=18, fontName='Helvetica-Bold', textColor=DARK, leading=24,
     )
     p = Paragraph(label, sty)
     t = Table([[p]], colWidths=[CONTENT_W])
     t.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, -1), BLUE_DARK),
-        ('TOPPADDING', (0, 0), (-1, -1), 6),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
-        ('LEFTPADDING', (0, 0), (-1, -1), 10),
-        ('RIGHTPADDING', (0, 0), (-1, -1), 10),
+        ('BACKGROUND', (0, 0), (-1, -1), WHITE),
+        ('TOPPADDING', (0, 0), (-1, -1), 10),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+        ('LEFTPADDING', (0, 0), (-1, -1), 0),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 0),
+        ('LINEBELOW', (0, 0), (-1, -1), 1, BLUE),
     ]))
     return t
 
 
 def _make_kv_table(data: list[list[str]], col_widths=None) -> Table:
-    """Compact key-value pair table (label + value)."""
+    """Key-value table — subtle row shading, no heavy borders."""
     if col_widths is None:
         col_widths = [2.2 * inch, 4.3 * inch]
     t = Table(data, colWidths=col_widths)
-    t.setStyle(TableStyle([
-        ('FONTSIZE', (0, 0), (-1, -1), 9),
+    style_cmds = [
+        ('FONTSIZE', (0, 0), (-1, -1), 9.5),
         ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
         ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
-        ('TEXTCOLOR', (0, 0), (0, -1), GREY),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
-        ('TOPPADDING', (0, 0), (-1, -1), 2),
+        ('TEXTCOLOR', (0, 0), (0, -1), DARK),
+        ('TEXTCOLOR', (1, 0), (-1, -1), colors.HexColor('#444444')),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+        ('TOPPADDING', (0, 0), (-1, -1), 5),
         ('LEFTPADDING', (0, 0), (-1, -1), 6),
         ('RIGHTPADDING', (0, 0), (-1, -1), 6),
-        ('GRID', (0, 0), (-1, -1), 0.5, GRID_COLOR),
+        ('LINEBELOW', (0, 0), (-1, -2), 0.25, GRID_COLOR),
+        ('LINEBELOW', (0, -1), (-1, -1), 0.5, GRID_COLOR),
         ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-    ]))
+    ]
+    for i in range(len(data)):
+        if i % 2 == 1:
+            style_cmds.append(('BACKGROUND', (0, i), (-1, i), LIGHT_BG))
+    t.setStyle(TableStyle(style_cmds))
     return t
 
 
 def _make_data_table(data: list[list[str]], col_widths=None) -> Table:
-    """Table with styled header row (white text on blue-dark background)."""
+    """Data table — subtle header, thin rules, no heavy grid."""
     if col_widths is None:
         ncols = len(data[0]) if data else 1
         w = CONTENT_W / ncols
         col_widths = [w] * ncols
     t = Table(data, colWidths=col_widths)
-    t.setStyle(TableStyle([
-        ('FONTSIZE', (0, 0), (-1, -1), 8),
+    style_cmds = [
+        ('FONTSIZE', (0, 0), (-1, -1), 8.5),
         ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
         ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('BACKGROUND', (0, 0), (-1, 0), BLUE_DARK),
+        ('BACKGROUND', (0, 0), (-1, 0), BLUE),
         ('TEXTCOLOR', (0, 0), (-1, 0), WHITE),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
-        ('TOPPADDING', (0, 0), (-1, -1), 2),
-        ('LEFTPADDING', (0, 0), (-1, -1), 4),
-        ('RIGHTPADDING', (0, 0), (-1, -1), 4),
-        ('GRID', (0, 0), (-1, -1), 0.5, GRID_COLOR),
+        ('LINEBELOW', (0, 0), (-1, 0), 0.75, BLUE),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+        ('TOPPADDING', (0, 0), (-1, -1), 4),
+        ('LEFTPADDING', (0, 0), (-1, -1), 6),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 6),
+        ('LINEBELOW', (0, 1), (-1, -2), 0.25, GRID_COLOR),
+        ('LINEBELOW', (0, -1), (-1, -1), 0.5, GRID_COLOR),
         ('VALIGN', (0, 0), (-1, -1), 'TOP'),
         ('ALIGN', (1, 1), (-1, -1), 'RIGHT'),
-    ]))
+    ]
+    for i in range(1, len(data)):
+        if i % 2 == 0:
+            style_cmds.append(('BACKGROUND', (0, i), (-1, i), LIGHT_BG))
+    t.setStyle(TableStyle(style_cmds))
     return t
 
 
@@ -261,6 +289,122 @@ def _image_from_bytes(image_bytes: bytes, width: float, height: float) -> RLImag
     """Convert raw PNG/JPEG bytes to a ReportLab Image flowable."""
     buf = BytesIO(image_bytes)
     return RLImage(buf, width=width, height=height)
+
+
+def _enhance_satellite_image(image_bytes: bytes, lot_geometry=None) -> bytes:
+    """Enhance satellite image for institutional presentation.
+
+    - Desaturate and darken for professional tone
+    - Draw lot boundary outline (thin white line) if geometry available
+    - Add north arrow (upper-right)
+    - Add scale indicator (lower-right)
+    - Add subtle vignette/shadow at edges
+    """
+    try:
+        from PIL import Image as PILImage, ImageEnhance, ImageDraw, ImageFont
+        from io import BytesIO as PILBuf
+
+        pil_img = PILImage.open(PILBuf(image_bytes))
+        if pil_img.mode != 'RGB':
+            pil_img = pil_img.convert('RGB')
+        w, h = pil_img.size
+
+        # Desaturate + darken
+        enhancer = ImageEnhance.Color(pil_img)
+        pil_img = enhancer.enhance(0.6)
+        enhancer = ImageEnhance.Brightness(pil_img)
+        pil_img = enhancer.enhance(0.82)
+
+        draw = ImageDraw.Draw(pil_img)
+
+        # ── Lot boundary outline ──
+        if lot_geometry:
+            try:
+                coords = None
+                if isinstance(lot_geometry, dict):
+                    coords = lot_geometry.get('coordinates', [])
+                    if lot_geometry.get('type') == 'MultiPolygon':
+                        # Flatten MultiPolygon to first polygon's outer ring
+                        if coords and coords[0]:
+                            coords = coords[0][0]
+                    elif lot_geometry.get('type') == 'Polygon':
+                        if coords:
+                            coords = coords[0]
+                elif hasattr(lot_geometry, 'coordinates'):
+                    coords = lot_geometry.coordinates
+                    if hasattr(lot_geometry, 'type'):
+                        if lot_geometry.type == 'MultiPolygon':
+                            coords = coords[0][0] if coords and coords[0] else None
+                        elif lot_geometry.type == 'Polygon':
+                            coords = coords[0] if coords else None
+
+                if coords and len(coords) >= 3:
+                    # Map geo coords to pixel coords
+                    lngs = [c[0] for c in coords]
+                    lats = [c[1] for c in coords]
+                    min_lng, max_lng = min(lngs), max(lngs)
+                    min_lat, max_lat = min(lats), max(lats)
+                    # Add padding
+                    pad = 0.15
+                    lng_range = max_lng - min_lng or 0.0001
+                    lat_range = max_lat - min_lat or 0.0001
+                    pixels = []
+                    for lng, lat in coords:
+                        px = pad * w + (1 - 2 * pad) * w * (lng - min_lng) / lng_range
+                        py = pad * h + (1 - 2 * pad) * h * (1 - (lat - min_lat) / lat_range)
+                        pixels.append((px, py))
+                    # Draw boundary outline — thin white with slight glow
+                    for width_px, color in [(4, (255, 255, 255, 60)), (2, (255, 255, 255, 180))]:
+                        pil_img_rgba = pil_img.convert('RGBA')
+                        overlay = PILImage.new('RGBA', pil_img_rgba.size, (0, 0, 0, 0))
+                        overlay_draw = ImageDraw.Draw(overlay)
+                        overlay_draw.line(pixels + [pixels[0]], fill=color, width=width_px)
+                        pil_img = PILImage.alpha_composite(pil_img_rgba, overlay).convert('RGB')
+                        draw = ImageDraw.Draw(pil_img)
+            except Exception:
+                pass  # Geometry parsing failed, skip boundary
+
+        # ── North arrow (upper-right corner) ──
+        arrow_x = w - 45
+        arrow_y = 20
+        arrow_len = 30
+        # Stem
+        draw.line([(arrow_x, arrow_y + arrow_len), (arrow_x, arrow_y + 4)],
+                  fill=(255, 255, 255), width=2)
+        # Arrowhead
+        draw.polygon([(arrow_x, arrow_y), (arrow_x - 6, arrow_y + 10),
+                       (arrow_x + 6, arrow_y + 10)],
+                      fill=(255, 255, 255))
+        # "N" label
+        try:
+            font = ImageFont.truetype("/System/Library/Fonts/Helvetica.ttc", 12)
+        except Exception:
+            font = ImageFont.load_default()
+        draw.text((arrow_x - 4, arrow_y + arrow_len + 2), "N",
+                  fill=(255, 255, 255), font=font)
+
+        # ── Scale bar (lower-right) ──
+        bar_len = 80
+        bar_y = h - 25
+        bar_x = w - bar_len - 20
+        draw.rectangle([(bar_x, bar_y), (bar_x + bar_len, bar_y + 4)],
+                        fill=(255, 255, 255))
+        draw.line([(bar_x, bar_y - 3), (bar_x, bar_y + 7)],
+                  fill=(255, 255, 255), width=1)
+        draw.line([(bar_x + bar_len, bar_y - 3), (bar_x + bar_len, bar_y + 7)],
+                  fill=(255, 255, 255), width=1)
+        try:
+            small_font = ImageFont.truetype("/System/Library/Fonts/Helvetica.ttc", 9)
+        except Exception:
+            small_font = ImageFont.load_default()
+        draw.text((bar_x + bar_len // 2 - 10, bar_y + 6), "~100 ft",
+                  fill=(255, 255, 255), font=small_font)
+
+        buf = PILBuf()
+        pil_img.save(buf, format='JPEG', quality=92)
+        return buf.getvalue()
+    except Exception:
+        return image_bytes
 
 
 def _make_feature_card(label: str, value: str, detail: str = "") -> str:
@@ -276,96 +420,110 @@ def _make_feature_card(label: str, value: str, detail: str = "") -> str:
 # ──────────────────────────────────────────────────────────────────
 
 def _build_cover_page(story, styles, lot, env, report_id, map_images=None):
-    """Cover page with branding, full-width satellite photo, and lot summary."""
-    story.append(Spacer(1, 20))
-
-    # Title
-    story.append(Paragraph("Zoning Feasibility Analysis", styles['ReportTitle']))
-    story.append(Spacer(1, 4))
-    story.append(HRFlowable(width="45%", thickness=2.5, color=GOLD, hAlign='CENTER'))
-    story.append(Spacer(1, 8))
-
-    # Address + BBL
-    story.append(Paragraph(
-        lot.address or "Address Not Available",
-        ParagraphStyle('CoverAddr', fontSize=16, alignment=TA_CENTER,
-                       textColor=DARK, fontName='Helvetica-Bold'),
-    ))
-    story.append(Spacer(1, 3))
-    story.append(Paragraph(f"BBL: {_format_bbl(lot.bbl)}", styles['Subtitle']))
+    """Cover page — boutique development firm aesthetic."""
     story.append(Spacer(1, 10))
 
-    # Full-width satellite photo
+    # ── Full-width satellite photo with professional enhancements ──
     if map_images and map_images.get("satellite_bytes"):
         try:
-            img = _image_from_bytes(map_images["satellite_bytes"], CONTENT_W, 3.2 * inch)
-            wrap_t = Table([[img]], colWidths=[CONTENT_W])
-            wrap_t.setStyle(TableStyle([
-                ('ALIGN', (0, 0), (0, 0), 'CENTER'),
-                ('TOPPADDING', (0, 0), (0, 0), 0),
-                ('BOTTOMPADDING', (0, 0), (0, 0), 0),
-                ('BOX', (0, 0), (-1, -1), 0.5, GRID_COLOR),
-            ]))
-            story.append(wrap_t)
-            story.append(Spacer(1, 10))
+            lot_geom = getattr(lot, 'geometry', None)
+            sat_bytes = _enhance_satellite_image(
+                map_images["satellite_bytes"], lot_geometry=lot_geom)
+            img = _image_from_bytes(sat_bytes, CONTENT_W, 3.0 * inch)
+            story.append(img)
+            story.append(Spacer(1, 14))
         except Exception:
-            pass
+            if map_images.get("satellite_bytes"):
+                img = _image_from_bytes(map_images["satellite_bytes"], CONTENT_W, 3.0 * inch)
+                story.append(img)
+                story.append(Spacer(1, 14))
 
-    # Summary table with neighbourhood and cross streets
-    neighbourhood = getattr(lot, 'neighbourhood', None) or ""
-    cross_streets = getattr(lot, 'cross_streets', None) or ""
-
-    cover_data = [
-        ["Borough", _borough_name(lot.borough)],
-    ]
-    if neighbourhood:
-        cover_data.append(["Neighborhood", neighbourhood])
-    if cross_streets:
-        cover_data.append(["Cross Streets", cross_streets])
-    cover_data.extend([
-        ["Lot Area", f"{lot.lot_area:,.0f} SF" if lot.lot_area else "N/A"],
-        ["Lot Type", lot.lot_type.capitalize()],
-        ["Zoning District", ", ".join(lot.zoning_districts) if lot.zoning_districts else "N/A"],
-        ["Date Generated", datetime.now().strftime('%B %d, %Y')],
-        ["Report ID", report_id],
-    ])
-
-    # Styled KV table with gold left accent
-    kv_t = Table(cover_data, colWidths=[2.0 * inch, 4.5 * inch])
-    kv_t.setStyle(TableStyle([
-        ('FONTSIZE', (0, 0), (-1, -1), 9),
-        ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
-        ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
-        ('TEXTCOLOR', (0, 0), (0, -1), BLUE_DARK),
-        ('TEXTCOLOR', (1, 0), (1, -1), DARK),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
-        ('TOPPADDING', (0, 0), (-1, -1), 4),
-        ('LEFTPADDING', (0, 0), (-1, -1), 8),
-        ('RIGHTPADDING', (0, 0), (-1, -1), 8),
-        ('GRID', (0, 0), (-1, -1), 0.5, GRID_COLOR),
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('LINEBEFORE', (0, 0), (0, -1), 3, GOLD),
-    ]))
-    story.append(kv_t)
-    story.append(Spacer(1, 14))
-
-    # "Prepared by" callout box
-    prep_html = (
-        '<font color="#D4A843"><b>Prepared by Massing Report</b></font><br/>'
-        '<font size="8" color="#666666">Automated Zoning Feasibility Analysis Engine</font>'
-    )
-    prep_p = Paragraph(prep_html, ParagraphStyle(
-        'PrepBy', fontSize=10, alignment=TA_CENTER, leading=14,
+    # ── Title block — large, centered, clean ──
+    addr_text = lot.address or "Address Not Available"
+    # Title case instead of ALL CAPS
+    addr_display = addr_text.title() if addr_text == addr_text.upper() else addr_text
+    story.append(Paragraph(
+        f"{addr_display}",
+        ParagraphStyle('CoverTitle', fontSize=28, fontName='Helvetica-Bold',
+                       textColor=DARK, alignment=TA_CENTER, leading=34),
     ))
-    prep_t = Table([[prep_p]], colWidths=[CONTENT_W])
-    prep_t.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, -1), GOLD_LIGHT),
-        ('TOPPADDING', (0, 0), (-1, -1), 8),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+    story.append(Spacer(1, 6))
+    story.append(Paragraph(
+        "Zoning Feasibility Analysis",
+        ParagraphStyle('CoverSubtitle', fontSize=13, fontName='Helvetica',
+                       textColor=GREY, alignment=TA_CENTER, leading=16),
+    ))
+    story.append(Spacer(1, 10))
+
+    # ── Thin gold rule ──
+    story.append(HRFlowable(width="30%", thickness=1, color=GOLD, hAlign='CENTER',
+                             spaceAfter=14))
+
+    # ── Horizontal info bar — key facts in one row ──
+    neighbourhood = getattr(lot, 'neighbourhood', None) or ""
+    zoning = ", ".join(lot.zoning_districts) if lot.zoning_districts else "N/A"
+    lot_area = f"{lot.lot_area:,.0f} SF" if lot.lot_area else "N/A"
+
+    info_style = ParagraphStyle('InfoBar', fontSize=8.5, fontName='Helvetica',
+                                textColor=GREY, alignment=TA_CENTER, leading=11)
+    info_bold = ParagraphStyle('InfoBarBold', fontSize=8.5, fontName='Helvetica-Bold',
+                               textColor=DARK, alignment=TA_CENTER, leading=11)
+
+    info_cells = [
+        [Paragraph("BBL", info_style), Paragraph("Zoning", info_style),
+         Paragraph("Lot Area", info_style), Paragraph("Borough", info_style)],
+        [Paragraph(_format_bbl(lot.bbl), info_bold), Paragraph(zoning, info_bold),
+         Paragraph(lot_area, info_bold), Paragraph(_borough_name(lot.borough), info_bold)],
+    ]
+
+    if neighbourhood:
+        info_cells[0].append(Paragraph("Neighborhood", info_style))
+        info_cells[1].append(Paragraph(neighbourhood, info_bold))
+
+    ncols = len(info_cells[0])
+    col_w = CONTENT_W / ncols
+    info_t = Table(info_cells, colWidths=[col_w] * ncols)
+    info_t.setStyle(TableStyle([
         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        ('BOX', (0, 0), (-1, -1), 1, GOLD),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('TOPPADDING', (0, 0), (-1, 0), 8),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 2),
+        ('TOPPADDING', (0, 1), (-1, 1), 2),
+        ('BOTTOMPADDING', (0, 1), (-1, 1), 8),
+        ('LINEBELOW', (0, 0), (-1, 0), 0, WHITE),
+        ('LINEABOVE', (0, 0), (-1, 0), 0.5, GRID_COLOR),
+        ('LINEBELOW', (0, 1), (-1, 1), 0.5, GRID_COLOR),
+        ('BACKGROUND', (0, 0), (-1, -1), LIGHT_BG),
     ]))
-    story.append(prep_t)
+    story.append(info_t)
+    story.append(Spacer(1, 18))
+
+    # ── Cross streets + lot details ──
+    cross_streets = getattr(lot, 'cross_streets', None) or ""
+    detail_items = []
+    if cross_streets:
+        detail_items.append(f"Cross Streets: {cross_streets}")
+    detail_items.append(f"Lot Type: {lot.lot_type.capitalize()}")
+    if lot.street_width:
+        detail_items.append(f"Street Width: {lot.street_width.capitalize()}")
+
+    detail_text = "  \u2022  ".join(detail_items)
+    story.append(Paragraph(
+        detail_text,
+        ParagraphStyle('CoverDetails', fontSize=9, fontName='Helvetica',
+                       textColor=GREY, alignment=TA_CENTER, leading=12),
+    ))
+    story.append(Spacer(1, 24))
+
+    # ── Minimal footer ──
+    footer_html = (
+        f'<font color="#AAAAAA" size="7.5">'
+        f'{datetime.now().strftime("%B %d, %Y")}  \u2022  Report ID: {report_id}'
+        f'</font>'
+    )
+    story.append(Paragraph(footer_html, ParagraphStyle(
+        'CoverFooter', fontSize=7.5, alignment=TA_CENTER, textColor=GREY,
+    )))
     story.append(PageBreak())
 
 
@@ -591,10 +749,10 @@ def _build_site_summary(story, styles, lot, env):
 
 def _build_highlighted_features(story, styles, lot, env, scenarios=None):
     """Section 4: Visual callout cards highlighting key development features."""
-    story.append(_section_header("Key Development Features", section_num=4, styles=styles))
+    story.append(_section_header("Development Characteristics", section_num=4, styles=styles))
     story.append(Spacer(1, 4))
     story.append(Paragraph(
-        "Important zoning characteristics and development features for this site:",
+        "Key zoning and site characteristics relevant to this development analysis:",
         styles['Body'],
     ))
     story.append(Spacer(1, 4))
@@ -703,19 +861,19 @@ def _render_feature_grid(story, styles, features):
         else:
             rows.append([cells[i], ""])
 
-    col_w = CONTENT_W / 2 - 2
-    t = Table(rows, colWidths=[col_w, col_w])
-    t.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, -1), FEATURE_BG),
-        ('GRID', (0, 0), (-1, -1), 0.5, GRID_COLOR),
-        ('TOPPADDING', (0, 0), (-1, -1), 6),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
-        ('LEFTPADDING', (0, 0), (-1, -1), 8),
-        ('RIGHTPADDING', (0, 0), (-1, -1), 8),
+    col_w = CONTENT_W / 2 - 4
+    t = Table(rows, colWidths=[col_w, col_w], spaceBefore=4, spaceAfter=4)
+    style_cmds = [
+        ('BACKGROUND', (0, 0), (-1, -1), LIGHT_BG),
+        ('TOPPADDING', (0, 0), (-1, -1), 10),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 10),
+        ('LEFTPADDING', (0, 0), (-1, -1), 10),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 10),
         ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-        ('LINEBEFORE', (0, 0), (0, -1), 3, GOLD),
-        ('LINEBEFORE', (1, 0), (1, -1), 3, GOLD),
-    ]))
+        ('LINEBELOW', (0, 0), (-1, -1), 0.25, GRID_COLOR),
+        ('LINEBEFORE', (1, 0), (1, -1), 0.25, GRID_COLOR),
+    ]
+    t.setStyle(TableStyle(style_cmds))
     story.append(t)
 
 
@@ -727,6 +885,66 @@ def _build_zoning_overview(story, styles, lot, env, map_images=None):
     """Section 5: Zoning districts, overlays, FAR, height/setback, and optional zoning map."""
     story.append(_section_header("Zoning Overview", section_num=5, styles=styles))
     story.append(Spacer(1, 6))
+
+    # ── Key Metric Data Cards — large bold numbers ──
+    metric_cards = []
+    lot_area_val = lot.lot_area or 0
+    if env.residential_far:
+        metric_cards.append(("Residential FAR", f"{env.residential_far:.2f}", "Floor Area Ratio"))
+    if env.max_building_height is not None:
+        metric_cards.append(("Max Height", f"{env.max_building_height:.0f}'", "Building Height Limit"))
+    elif env.height_factor:
+        metric_cards.append(("Max Height", "No Cap", "Sky Exposure Plane"))
+    if env.residential_far and lot_area_val:
+        max_zfa = env.residential_far * lot_area_val
+        du_raw = max_zfa / 680
+        du_count = int(du_raw) + 1 if du_raw - int(du_raw) >= 0.75 else int(du_raw)
+        metric_cards.append(("Max Units", str(du_count), f"Based on {max_zfa:,.0f} SF ZFA"))
+    if env.residential_far and lot_area_val:
+        max_zfa = env.residential_far * lot_area_val
+        metric_cards.append(("Max ZFA", f"{max_zfa:,.0f}", "Zoning Floor Area (SF)"))
+    if env.lot_coverage_max is not None:
+        metric_cards.append(("Lot Coverage", f"{env.lot_coverage_max:.0f}%", "Maximum Coverage"))
+
+    if metric_cards:
+        # Limit to 4 cards for clean layout
+        metric_cards = metric_cards[:4]
+        ncards = len(metric_cards)
+        card_w = CONTENT_W / ncards
+
+        lbl_style = ParagraphStyle('_mcLbl', fontSize=7.5, fontName='Helvetica',
+                                    textColor=GREY, alignment=TA_CENTER, leading=9)
+        val_style = ParagraphStyle('_mcVal', fontSize=22, fontName='Helvetica-Bold',
+                                    textColor=BLUE, alignment=TA_CENTER, leading=26)
+        sub_style = ParagraphStyle('_mcSub', fontSize=7, fontName='Helvetica',
+                                    textColor=GREY, alignment=TA_CENTER, leading=9)
+
+        row_labels = [Paragraph(t, lbl_style) for t, _, _ in metric_cards]
+        row_values = [Paragraph(v, val_style) for _, v, _ in metric_cards]
+        row_subs = [Paragraph(s, sub_style) for _, _, s in metric_cards]
+
+        card_t = Table([row_labels, row_values, row_subs],
+                       colWidths=[card_w] * ncards)
+        style_cmds = [
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('TOPPADDING', (0, 0), (-1, 0), 8),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 1),
+            ('TOPPADDING', (0, 1), (-1, 1), 2),
+            ('BOTTOMPADDING', (0, 1), (-1, 1), 2),
+            ('TOPPADDING', (0, 2), (-1, 2), 1),
+            ('BOTTOMPADDING', (0, 2), (-1, 2), 8),
+            ('LEFTPADDING', (0, 0), (-1, -1), 6),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 6),
+            ('BACKGROUND', (0, 0), (-1, -1), LIGHT_BG),
+            ('LINEABOVE', (0, 0), (-1, 0), 2, GOLD),
+            ('LINEBELOW', (0, -1), (-1, -1), 0.5, GRID_COLOR),
+        ]
+        for i in range(1, ncards):
+            style_cmds.append(('LINEBEFORE', (i, 0), (i, -1), 0.25, GRID_COLOR))
+        card_t.setStyle(TableStyle(style_cmds))
+        story.append(card_t)
+        story.append(Spacer(1, 10))
 
     # ── Zoning map image (if available) ──
     if map_images and map_images.get("zoning_map_bytes"):
@@ -943,7 +1161,7 @@ def _build_zoning_overview(story, styles, lot, env, map_images=None):
 def _build_calculation_breakdown(story, styles, lot, env):
     """Section 6: Show-your-work calculations in two-column layout."""
     story.append(PageBreak())
-    story.append(_section_header("Detailed Calculations", section_num=6, styles=styles))
+    story.append(_section_header("Calculation Detail", section_num=6, styles=styles))
     story.append(Spacer(1, 4))
     story.append(Paragraph(
         "Step-by-step breakdown of key zoning calculations for this site. "
@@ -1150,19 +1368,19 @@ def _build_highlight_badges(scenario, lot=None, envelope=None):
 
 
 def _build_scenario_manifest_table(scenario, styles):
-    """Build the analyst manifest table for a single scenario (inline)."""
+    """Build the development summary table for a single scenario."""
     s = scenario
     gross_sf = s.total_gross_sf
     net_sf = s.total_net_sf
     zfa = s.zoning_floor_area or gross_sf
     loss_pct = f"{s.loss_factor.loss_factor_pct:.1f}%" if s.loss_factor else "\u2014"
-    eff_ratio = f"{s.loss_factor.efficiency_ratio:.1f}%" if s.loss_factor else "\u2014"
+    eff_ratio = f"{s.loss_factor.efficiency_ratio*100:.1f}%" if s.loss_factor else "\u2014"
     avg_unit_sf = f"{s.unit_mix.average_unit_sf:,.0f}" if s.unit_mix else "\u2014"
     parking_spaces = str(s.parking.total_spaces_required) if s.parking else "\u2014"
     waiver = "Yes" if (s.parking and s.parking.waiver_eligible) else "No"
 
     rows = [
-        ["Metric", "Value"],
+        ["", ""],
         ["Total Units", str(s.total_units) if s.total_units else "\u2014"],
         ["Zoning Floor Area (ZFA)", f"{zfa:,.0f} SF"],
         ["Gross Building Area", f"{gross_sf:,.0f} SF"],
@@ -1182,34 +1400,44 @@ def _build_scenario_manifest_table(scenario, styles):
 
     col_widths = [2.8 * inch, CONTENT_W - 2.8 * inch]
     t = Table(rows, colWidths=col_widths)
-    t.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), BLUE_DARK),
+    style_cmds = [
+        ('BACKGROUND', (0, 0), (-1, 0), BLUE),
         ('TEXTCOLOR', (0, 0), (-1, 0), WHITE),
         ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
         ('FONTSIZE', (0, 0), (-1, 0), 7.5),
         ('FONTSIZE', (0, 1), (-1, -1), 8),
         ('FONTNAME', (0, 1), (0, -1), 'Helvetica-Bold'),
         ('FONTNAME', (1, 1), (1, -1), 'Helvetica'),
-        ('TEXTCOLOR', (0, 1), (0, -1), GREY),
-        ('TEXTCOLOR', (1, 1), (1, -1), DARK),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
-        ('TOPPADDING', (0, 0), (-1, -1), 2),
+        ('TEXTCOLOR', (0, 1), (0, -1), DARK),
+        ('TEXTCOLOR', (1, 1), (1, -1), colors.HexColor('#444444')),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+        ('TOPPADDING', (0, 0), (-1, -1), 3),
         ('LEFTPADDING', (0, 0), (-1, -1), 6),
         ('RIGHTPADDING', (0, 0), (-1, -1), 6),
-        ('GRID', (0, 0), (-1, -1), 0.5, GRID_COLOR),
+        ('LINEBELOW', (0, 0), (-1, 0), 0.75, BLUE),
+        ('LINEBELOW', (0, 1), (-1, -2), 0.25, GRID_COLOR),
+        ('LINEBELOW', (0, -1), (-1, -1), 0.5, GRID_COLOR),
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        *[('BACKGROUND', (0, i), (-1, i), FEATURE_BG)
-          for i in range(2, len(rows), 2)],
-    ]))
+    ]
+    for i in range(1, len(rows)):
+        if i % 2 == 0:
+            style_cmds.append(('BACKGROUND', (0, i), (-1, i), LIGHT_BG))
+    t.setStyle(TableStyle(style_cmds))
     return t
 
 
 def _build_development_scenarios(story, styles, scenarios, lot=None, envelope=None, massing_models=None):
-    """Section 7: Individual scenarios with highlight badges, full program,
-    optional 3D massing, and inline analyst manifest."""
+    """Section 7: Investment case study format — scenario name, executive takeaway,
+    key metrics row, detailed program, optional 3D massing, and development summary."""
     story.append(PageBreak())
     story.append(_section_header("Development Scenarios", section_num=7, styles=styles))
     story.append(Spacer(1, 4))
+    story.append(Paragraph(
+        "Each scenario below represents a distinct development strategy evaluated "
+        "against the applicable zoning controls for this site.",
+        styles['Body'],
+    ))
+    story.append(Spacer(1, 6))
 
     # Lazy-import the renderer so we don't crash if matplotlib is missing
     render_fn = None
@@ -1223,19 +1451,19 @@ def _build_development_scenarios(story, styles, scenarios, lot=None, envelope=No
     kv_half = [1.2 * inch, col_half - 1.2 * inch]  # KV table widths within half
 
     for i, scenario in enumerate(scenarios):
-        # ── Scenario header (numbered, gold left-border + top-rule) ──
-        sc_head = Paragraph(
-            f"<b>Scenario {i+1}</b>",
-            ParagraphStyle('ScHead', fontSize=11, fontName='Helvetica-Bold',
-                           textColor=DARK, leading=14),
+        # ── Investment case study header ──
+        sc_title = Paragraph(
+            f"<b>Scenario {i+1}: {scenario.name}</b>",
+            ParagraphStyle('ScCaseTitle', fontSize=13, fontName='Helvetica-Bold',
+                           textColor=DARK, leading=16),
         )
-        sc_bar = Table([[sc_head]], colWidths=[CONTENT_W])
+        sc_bar = Table([[sc_title]], colWidths=[CONTENT_W])
         sc_bar.setStyle(TableStyle([
-            ('TOPPADDING', (0, 0), (-1, -1), 4),
+            ('TOPPADDING', (0, 0), (-1, -1), 6),
             ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
-            ('LEFTPADDING', (0, 0), (-1, -1), 8),
+            ('LEFTPADDING', (0, 0), (-1, -1), 10),
             ('LINEBEFORE', (0, 0), (0, -1), 3, GOLD),
-            ('LINEABOVE', (0, 0), (-1, 0), 1, GOLD),
+            ('LINEABOVE', (0, 0), (-1, 0), 0.75, GRID_COLOR),
         ]))
         story.append(sc_bar)
 
@@ -1244,9 +1472,50 @@ def _build_development_scenarios(story, styles, scenarios, lot=None, envelope=No
         if badges:
             story.append(badges)
 
-        story.append(Spacer(1, 2))
-        story.append(Paragraph(scenario.description, styles['SmallBody']))
-        story.append(Spacer(1, 2))
+        # ── Executive takeaway (2-3 sentence summary) ──
+        story.append(Spacer(1, 3))
+        story.append(Paragraph(scenario.description, styles['ExecutiveSummary']))
+        story.append(Spacer(1, 3))
+
+        # ── Key Metrics summary row (Units | ZFA | FAR | Height | Efficiency) ──
+        km_cells_top = []
+        km_cells_bot = []
+        km_style_lbl = ParagraphStyle('_kmLbl', fontSize=7, fontName='Helvetica',
+                                       textColor=GREY, alignment=TA_CENTER, leading=9)
+        km_style_val = ParagraphStyle('_kmVal', fontSize=16, fontName='Helvetica-Bold',
+                                       textColor=BLUE, alignment=TA_CENTER, leading=19)
+        km_metrics = []
+        if scenario.total_units > 0:
+            km_metrics.append(("Units", str(scenario.total_units)))
+        if scenario.zoning_floor_area:
+            km_metrics.append(("ZFA", f"{scenario.zoning_floor_area:,.0f}"))
+        km_metrics.append(("FAR", f"{scenario.far_used:.2f}"))
+        km_metrics.append(("Height", f"{scenario.max_height_ft:.0f}'"))
+        km_metrics.append(("Floors", str(scenario.num_floors)))
+        if scenario.loss_factor:
+            km_metrics.append(("Efficiency", f"{scenario.loss_factor.efficiency_ratio*100:.0f}%"))
+
+        for lbl, val in km_metrics:
+            km_cells_top.append(Paragraph(val, km_style_val))
+            km_cells_bot.append(Paragraph(lbl, km_style_lbl))
+
+        nkm = len(km_metrics)
+        km_w = CONTENT_W / nkm
+        km_t = Table([km_cells_top, km_cells_bot], colWidths=[km_w] * nkm)
+        km_t.setStyle(TableStyle([
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('TOPPADDING', (0, 0), (-1, 0), 8),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 2),
+            ('TOPPADDING', (0, 1), (-1, 1), 0),
+            ('BOTTOMPADDING', (0, 1), (-1, 1), 8),
+            ('BACKGROUND', (0, 0), (-1, -1), LIGHT_BG),
+            ('LINEABOVE', (0, 0), (-1, 0), 0.5, GRID_COLOR),
+            ('LINEBELOW', (0, -1), (-1, -1), 0.5, GRID_COLOR),
+            *[('LINEBEFORE', (j, 0), (j, -1), 0.25, GRID_COLOR) for j in range(1, nkm)],
+        ]))
+        story.append(km_t)
+        story.append(Spacer(1, 6))
 
         # ── BUILD LEFT COLUMN: summary + core + efficiency + parking ──
         left_parts = []
@@ -1435,16 +1704,16 @@ def _build_development_scenarios(story, styles, scenarios, lot=None, envelope=No
                 logger.warning("Failed to render 3D massing for '%s': %s",
                                scenario.name, e)
 
-        # ── Inline Analyst's Manifest ──
+        # ── Development Summary ──
         story.append(Spacer(1, 4))
-        story.append(Paragraph("Analyst\u2019s Manifest", styles['SubSectionItalic']))
+        story.append(Paragraph("Development Summary", styles['SubSection']))
         manifest_t = _build_scenario_manifest_table(scenario, styles)
         story.append(manifest_t)
 
         # ── Scenario separator ──
-        story.append(Spacer(1, 4))
-        story.append(HRFlowable(width="80%", thickness=0.5, color=GRID_COLOR, hAlign='CENTER'))
-        story.append(Spacer(1, 4))
+        story.append(Spacer(1, 12))
+        story.append(HRFlowable(width="50%", thickness=0.25, color=GRID_COLOR, hAlign='CENTER'))
+        story.append(Spacer(1, 12))
 
 
 # ──────────────────────────────────────────────────────────────────
@@ -1460,7 +1729,7 @@ def _build_comparison_table(story, styles, scenarios):
     story.append(_section_header("Scenario Comparison", section_num=8, styles=styles))
     story.append(Spacer(1, 4))
     story.append(Paragraph(
-        "Side-by-side comparison of all development scenarios analyzed:",
+        "Side-by-side comparison of all evaluated development programs for this site:",
         styles['Body'],
     ))
     story.append(Spacer(1, 4))
@@ -1525,16 +1794,22 @@ def _build_comparison_table(story, styles, scenarios):
         ('FONTSIZE', (0, 0), (-1, 0), 1),             # header row (Paragraph handles font)
         ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
         ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
-        ('BACKGROUND', (0, 0), (-1, 0), BLUE_DARK),
-        ('TEXTCOLOR', (0, 1), (0, -1), GREY),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
-        ('TOPPADDING', (0, 0), (-1, -1), 2),
-        ('LEFTPADDING', (0, 0), (-1, -1), 3),
-        ('RIGHTPADDING', (0, 0), (-1, -1), 3),
-        ('GRID', (0, 0), (-1, -1), 0.5, GRID_COLOR),
+        ('BACKGROUND', (0, 0), (-1, 0), BLUE),
+        ('TEXTCOLOR', (0, 1), (0, -1), DARK),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+        ('TOPPADDING', (0, 0), (-1, -1), 3),
+        ('LEFTPADDING', (0, 0), (-1, -1), 4),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 4),
+        ('LINEBELOW', (0, 0), (-1, 0), 0.75, BLUE),
+        ('LINEBELOW', (0, 1), (-1, -2), 0.25, GRID_COLOR),
+        ('LINEBELOW', (0, -1), (-1, -1), 0.5, GRID_COLOR),
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
         ('ALIGN', (1, 1), (-1, -1), 'RIGHT'),
     ]
+    # Alternating row shading
+    for row_i in range(1, len(rows)):
+        if row_i % 2 == 0:
+            style_cmds.append(('BACKGROUND', (0, row_i), (-1, row_i), LIGHT_BG))
     # Highlight best scenario (highest gross SF)
     if scenarios:
         best_idx = max(range(len(scenarios)), key=lambda i: scenarios[i].total_gross_sf)
@@ -1581,7 +1856,7 @@ def _build_parking_analysis(story, styles, scenarios, parking_layout_result=None
                 "Yes" if s.parking.waiver_eligible else "No",
             ])
     story.append(_make_data_table(pk_data, col_widths=[
-        2.2 * inch, 0.9 * inch, 0.9 * inch, 0.8 * inch, 0.8 * inch,
+        2.4 * inch, 0.85 * inch, 0.85 * inch, 0.75 * inch, 0.7 * inch,
     ]))
     story.append(Spacer(1, 6))
 
@@ -1794,11 +2069,11 @@ def _build_assemblage_section(story, styles, assemblage_data):
 # ──────────────────────────────────────────────────────────────────
 
 def _build_disclaimers(story, styles, report_id):
-    """Section 11: Notes & Disclaimers (no dollar / valuation references)."""
+    """Section 11: Disclaimers & Limitations (no dollar / valuation references)."""
     story.append(Spacer(1, 20))
     story.append(HRFlowable(width="100%", thickness=0.5, color=GREY))
     story.append(Spacer(1, 6))
-    story.append(_section_header("Notes & Disclaimers", section_num=11, styles=styles))
+    story.append(_section_header("Disclaimers & Limitations", section_num=11, styles=styles))
     story.append(Spacer(1, 4))
 
     disclaimers = [
@@ -1855,7 +2130,7 @@ def generate_report(
     buffer = BytesIO()
     doc = SimpleDocTemplate(
         buffer, pagesize=letter,
-        topMargin=1.0 * inch, bottomMargin=0.75 * inch,
+        topMargin=1.0 * inch, bottomMargin=0.8 * inch,
         leftMargin=MARGIN, rightMargin=MARGIN,
     )
 
@@ -1925,7 +2200,7 @@ def generate_report_bytes(
 
     doc = SimpleDocTemplate(
         buffer, pagesize=letter,
-        topMargin=1.0 * inch, bottomMargin=0.75 * inch,
+        topMargin=1.0 * inch, bottomMargin=0.8 * inch,
         leftMargin=MARGIN, rightMargin=MARGIN,
     )
 
@@ -2000,7 +2275,8 @@ def _land_use_desc(code: str) -> str:
         "10": "Parking Facilities",
         "11": "Vacant Land",
     }
-    return codes.get(code, f"Code {code}")
+    # Try zero-padded first, then raw code
+    return codes.get(code, codes.get(code.zfill(2), f"Code {code}"))
 
 
 def _zoning_district_desc(district: str) -> str:
