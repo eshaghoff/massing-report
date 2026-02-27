@@ -23,7 +23,9 @@ from app.services.street_width import determine_street_width
 from app.services.maps import (
     fetch_satellite_image, fetch_street_map_image,
     fetch_zoning_map_image, fetch_context_map_image,
+    fetch_city_overview_map,
 )
+from app.services.geocoding import fetch_neighbourhood, fetch_cross_streets
 from app.zoning_engine.calculator import ZoningCalculator
 from app.zoning_engine.massing import compute_massing_geometry
 from app.zoning_engine.massing_builder import build_massing_model
@@ -83,10 +85,14 @@ async def _run_analysis(address: str = None, bbl: str = None):
         parsed = parse_bbl(bbl)
         if not parsed:
             raise HTTPException(status_code=400, detail=f"Invalid BBL: {bbl}")
-        bbl_result = BBLResponse(
-            bbl=parsed, borough=int(parsed[0]),
-            block=int(parsed[1:6]), lot=int(parsed[6:10]),
-        )
+        # Try geocoding the BBL to get coordinates + neighbourhood
+        try:
+            bbl_result = await geocode_address(parsed)
+        except Exception:
+            bbl_result = BBLResponse(
+                bbl=parsed, borough=int(parsed[0]),
+                block=int(parsed[1:6]), lot=int(parsed[6:10]),
+            )
     else:
         raise HTTPException(status_code=400, detail="Provide address or bbl.")
 
@@ -110,6 +116,24 @@ async def _run_analysis(address: str = None, bbl: str = None):
         pass
 
     lot_profile = await _build_lot_profile(bbl_result, pluto, geometry, zoning_layers)
+
+    # Populate neighbourhood from geocode result or dedicated lookup
+    if hasattr(bbl_result, 'neighbourhood') and bbl_result.neighbourhood:
+        lot_profile.neighbourhood = bbl_result.neighbourhood
+    elif lot_profile.address:
+        try:
+            lot_profile.neighbourhood = await fetch_neighbourhood(lot_profile.address)
+        except Exception:
+            pass
+
+    # Populate cross streets
+    if lot_profile.latitude and lot_profile.longitude:
+        try:
+            lot_profile.cross_streets = await fetch_cross_streets(
+                lot_profile.latitude, lot_profile.longitude
+            )
+        except Exception:
+            pass
 
     # Zoning calc
     try:
@@ -310,18 +334,20 @@ async def _generate_report_task(report_id: str, req: GenerateRequest, user: User
         lng = lot_profile.longitude
         lot_geom = lot_profile.geometry
         if lat and lng:
-            sat, street, zmap, ctx = await asyncio.gather(
+            sat, street, zmap, ctx, city = await asyncio.gather(
                 fetch_satellite_image(lat, lng, lot_geom),
                 fetch_street_map_image(lat, lng, lot_geom),
                 fetch_zoning_map_image(lat, lng, lot_geom),
                 fetch_context_map_image(lat, lng, lot_geom),
+                fetch_city_overview_map(lat, lng),
             )
-            if any([sat, street, zmap, ctx]):
+            if any([sat, street, zmap, ctx, city]):
                 map_images = {
                     "satellite_bytes": sat,
                     "street_bytes": street,
                     "zoning_map_bytes": zmap,
                     "context_map_bytes": ctx,
+                    "city_overview_bytes": city,
                 }
 
         # Massing models

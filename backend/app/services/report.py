@@ -41,20 +41,20 @@ logger = logging.getLogger(__name__)
 
 OUTPUT_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "output")
 
-# ── Brand Colors ──
-BLUE = colors.HexColor('#4A90D9')
-BLUE_DARK = colors.HexColor('#2C5F8A')
-DARK = colors.HexColor('#1a1a2e')
-GREY = colors.HexColor('#666666')
-LIGHT_BG = colors.HexColor('#f0f4f8')
-GRID_COLOR = colors.HexColor('#e0e0e0')
-GREEN_BG = colors.HexColor('#e8f4e8')
-HIGHLIGHT_BORDER = colors.HexColor('#4A90D9')
-FEATURE_BG = colors.HexColor('#f7f9fc')
-GOLD = colors.HexColor('#D4A017')
-GOLD_LIGHT = colors.HexColor('#FFF8E1')
-BADGE_BLUE = colors.HexColor('#E8F0FE')
-BADGE_GREEN = colors.HexColor('#E6F4EA')
+# ── Brand Colors (matching frontend Massing Report identity) ──
+BLUE = colors.HexColor('#2C5F7C')           # Brand Navy (primary)
+BLUE_DARK = colors.HexColor('#1E4A5E')      # Brand Navy Dark (headers)
+DARK = colors.HexColor('#1a1a2e')            # Text
+GREY = colors.HexColor('#666666')            # Secondary text
+LIGHT_BG = colors.HexColor('#f0f4f8')        # Light backgrounds
+GRID_COLOR = colors.HexColor('#e0e0e0')      # Table grids
+GREEN_BG = colors.HexColor('#e8f4e8')        # Highlighted scenarios
+HIGHLIGHT_BORDER = colors.HexColor('#2C5F7C')  # Accent borders
+FEATURE_BG = colors.HexColor('#f7f9fc')      # Feature card backgrounds
+GOLD = colors.HexColor('#D4A843')            # Brand Gold (accents)
+GOLD_LIGHT = colors.HexColor('#FDF6E3')      # Light gold backgrounds
+BADGE_BLUE = colors.HexColor('#E3EEF3')      # Navy-tinted badge backgrounds
+BADGE_GREEN = colors.HexColor('#E6F4EA')     # Green badge backgrounds
 WHITE = colors.white
 
 PAGE_W, PAGE_H = letter
@@ -276,55 +276,82 @@ def _make_feature_card(label: str, value: str, detail: str = "") -> str:
 # ──────────────────────────────────────────────────────────────────
 
 def _build_cover_page(story, styles, lot, env, report_id, map_images=None):
-    """Cover page with branding, satellite thumbnail, and lot summary."""
-    story.append(Spacer(1, 25))
+    """Cover page with branding, full-width satellite photo, and lot summary."""
+    story.append(Spacer(1, 20))
 
     # Title
     story.append(Paragraph("Zoning Feasibility Analysis", styles['ReportTitle']))
-    story.append(Spacer(1, 6))
-    story.append(HRFlowable(width="55%", thickness=2.5, color=GOLD, hAlign='CENTER'))
-    story.append(Spacer(1, 10))
+    story.append(Spacer(1, 4))
+    story.append(HRFlowable(width="45%", thickness=2.5, color=GOLD, hAlign='CENTER'))
+    story.append(Spacer(1, 8))
 
-    # Address
+    # Address + BBL
     story.append(Paragraph(
         lot.address or "Address Not Available",
         ParagraphStyle('CoverAddr', fontSize=16, alignment=TA_CENTER,
                        textColor=DARK, fontName='Helvetica-Bold'),
     ))
-    story.append(Spacer(1, 4))
+    story.append(Spacer(1, 3))
     story.append(Paragraph(f"BBL: {_format_bbl(lot.bbl)}", styles['Subtitle']))
-    story.append(Spacer(1, 14))
+    story.append(Spacer(1, 10))
 
-    # Satellite thumbnail (centred)
+    # Full-width satellite photo
     if map_images and map_images.get("satellite_bytes"):
         try:
-            img = _image_from_bytes(map_images["satellite_bytes"], 4.0 * inch, 2.5 * inch)
+            img = _image_from_bytes(map_images["satellite_bytes"], CONTENT_W, 3.2 * inch)
             wrap_t = Table([[img]], colWidths=[CONTENT_W])
             wrap_t.setStyle(TableStyle([
                 ('ALIGN', (0, 0), (0, 0), 'CENTER'),
                 ('TOPPADDING', (0, 0), (0, 0), 0),
                 ('BOTTOMPADDING', (0, 0), (0, 0), 0),
+                ('BOX', (0, 0), (-1, -1), 0.5, GRID_COLOR),
             ]))
             story.append(wrap_t)
             story.append(Spacer(1, 10))
         except Exception:
             pass
 
-    # Summary table — NO lot dimensions
+    # Summary table with neighbourhood and cross streets
+    neighbourhood = getattr(lot, 'neighbourhood', None) or ""
+    cross_streets = getattr(lot, 'cross_streets', None) or ""
+
     cover_data = [
         ["Borough", _borough_name(lot.borough)],
+    ]
+    if neighbourhood:
+        cover_data.append(["Neighborhood", neighbourhood])
+    if cross_streets:
+        cover_data.append(["Cross Streets", cross_streets])
+    cover_data.extend([
         ["Lot Area", f"{lot.lot_area:,.0f} SF" if lot.lot_area else "N/A"],
         ["Lot Type", lot.lot_type.capitalize()],
         ["Zoning District", ", ".join(lot.zoning_districts) if lot.zoning_districts else "N/A"],
         ["Date Generated", datetime.now().strftime('%B %d, %Y')],
         ["Report ID", report_id],
-    ]
-    story.append(_make_kv_table(cover_data))
-    story.append(Spacer(1, 16))
+    ])
+
+    # Styled KV table with gold left accent
+    kv_t = Table(cover_data, colWidths=[2.0 * inch, 4.5 * inch])
+    kv_t.setStyle(TableStyle([
+        ('FONTSIZE', (0, 0), (-1, -1), 9),
+        ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+        ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+        ('TEXTCOLOR', (0, 0), (0, -1), BLUE_DARK),
+        ('TEXTCOLOR', (1, 0), (1, -1), DARK),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+        ('TOPPADDING', (0, 0), (-1, -1), 4),
+        ('LEFTPADDING', (0, 0), (-1, -1), 8),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 8),
+        ('GRID', (0, 0), (-1, -1), 0.5, GRID_COLOR),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('LINEBEFORE', (0, 0), (0, -1), 3, GOLD),
+    ]))
+    story.append(kv_t)
+    story.append(Spacer(1, 14))
 
     # "Prepared by" callout box
     prep_html = (
-        '<font color="#D4A017"><b>Prepared by Massing Report</b></font><br/>'
+        '<font color="#D4A843"><b>Prepared by Massing Report</b></font><br/>'
         '<font size="8" color="#666666">Automated Zoning Feasibility Analysis Engine</font>'
     )
     prep_p = Paragraph(prep_html, ParagraphStyle(
@@ -347,53 +374,107 @@ def _build_cover_page(story, styles, lot, env, report_id, map_images=None):
 # ──────────────────────────────────────────────────────────────────
 
 def _build_property_maps(story, styles, lot, map_images):
-    """Section 2: Satellite and street map images."""
-    has_satellite = map_images and map_images.get("satellite_bytes")
+    """Section 2: NYC overview map + close-up street map (no satellite — it's on cover)."""
     has_street = map_images and map_images.get("street_bytes")
+    has_city = map_images and map_images.get("city_overview_bytes")
+    has_context = map_images and map_images.get("context_map_bytes")
     has_geometry = lot.geometry is not None
 
-    if not has_satellite and not has_street and not has_geometry:
+    if not has_street and not has_city and not has_context and not has_geometry:
         return
 
-    story.append(_section_header("Property Maps", section_num=2, styles=styles))
-    story.append(Spacer(1, 6))
+    story.append(_section_header("Property Location", section_num=2, styles=styles))
+    story.append(Spacer(1, 8))
 
-    if has_satellite:
+    # Try side-by-side layout: NYC overview (left) + close-up street (right)
+    left_img = None
+    right_img = None
+
+    # Left: NYC overview or context map
+    if has_city:
         try:
-            story.append(Paragraph("Satellite View with Lot Boundary", styles['SubSection']))
-            img = _image_from_bytes(map_images["satellite_bytes"], CONTENT_W, 4.0 * inch)
-            story.append(img)
-            story.append(Paragraph(
-                "Lot boundary outlined in blue. Source: ESRI World Imagery.",
-                styles['NoteText'],
-            ))
-            story.append(Spacer(1, 8))
+            left_img = _image_from_bytes(map_images["city_overview_bytes"], 3.3 * inch, 2.8 * inch)
+        except Exception:
+            pass
+    if not left_img and has_context:
+        try:
+            left_img = _image_from_bytes(map_images["context_map_bytes"], 3.3 * inch, 2.8 * inch)
         except Exception:
             pass
 
+    # Right: close-up street map
     if has_street:
         try:
-            story.append(Paragraph("Street Map Context", styles['SubSection']))
-            img = _image_from_bytes(map_images["street_bytes"], CONTENT_W, 3.5 * inch)
-            story.append(img)
+            right_img = _image_from_bytes(map_images["street_bytes"], 3.3 * inch, 2.8 * inch)
+        except Exception:
+            pass
+
+    if left_img and right_img:
+        # Side-by-side layout
+        left_cell = [
+            [Paragraph("NYC Overview", ParagraphStyle(
+                'MapLabel', fontSize=9, fontName='Helvetica-Bold',
+                textColor=BLUE_DARK, alignment=TA_CENTER, spaceAfter=4))],
+            [left_img],
+            [Paragraph(
+                "Red marker indicates subject property. Source: ESRI.",
+                ParagraphStyle('MapNote', fontSize=7, fontName='Helvetica-Oblique',
+                               textColor=GREY, alignment=TA_CENTER, spaceBefore=2))],
+        ]
+        right_cell = [
+            [Paragraph("Property Close-Up", ParagraphStyle(
+                'MapLabel2', fontSize=9, fontName='Helvetica-Bold',
+                textColor=BLUE_DARK, alignment=TA_CENTER, spaceAfter=4))],
+            [right_img],
+            [Paragraph(
+                "Lot boundary outlined in blue. Source: ESRI / OpenStreetMap.",
+                ParagraphStyle('MapNote2', fontSize=7, fontName='Helvetica-Oblique',
+                               textColor=GREY, alignment=TA_CENTER, spaceBefore=2))],
+        ]
+        left_t = Table(left_cell, colWidths=[3.3 * inch])
+        right_t = Table(right_cell, colWidths=[3.3 * inch])
+        for t in (left_t, right_t):
+            t.setStyle(TableStyle([
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+                ('TOPPADDING', (0, 0), (-1, -1), 0),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 0),
+            ]))
+
+        pair = Table([[left_t, right_t]], colWidths=[CONTENT_W / 2, CONTENT_W / 2])
+        pair.setStyle(TableStyle([
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ]))
+        story.append(pair)
+        story.append(Spacer(1, 10))
+    else:
+        # Fallback: stack whatever we have
+        if left_img:
+            story.append(Paragraph("NYC Overview", styles['SubSection']))
+            story.append(left_img)
+            story.append(Paragraph(
+                "Red marker indicates subject property. Source: ESRI.",
+                styles['NoteText'],
+            ))
+            story.append(Spacer(1, 8))
+        if right_img:
+            story.append(Paragraph("Street Map with Lot Boundary", styles['SubSection']))
+            story.append(right_img)
             story.append(Paragraph(
                 "Lot boundary outlined in blue. Source: ESRI / OpenStreetMap.",
                 styles['NoteText'],
             ))
             story.append(Spacer(1, 8))
-        except Exception:
-            pass
 
-    # Zoomed-out context map (neighbourhood / half-borough scale)
-    has_context = map_images and map_images.get("context_map_bytes")
-    if has_context:
+    # If we still have the context map and it wasn't used above, show it
+    if has_context and not has_city and left_img is None:
         try:
-            story.append(Paragraph("Neighbourhood Context Map", styles['SubSection']))
-            img = _image_from_bytes(map_images["context_map_bytes"], CONTENT_W, 3.0 * inch)
-            story.append(img)
+            story.append(Paragraph("Neighbourhood Context", styles['SubSection']))
+            ctx_img = _image_from_bytes(map_images["context_map_bytes"], CONTENT_W, 3.0 * inch)
+            story.append(ctx_img)
             story.append(Paragraph(
-                "Zoomed-out view showing property location within the borough. "
-                "Red marker indicates subject property. Source: ESRI.",
+                "Zoomed-out view showing property location. Source: ESRI.",
                 styles['NoteText'],
             ))
             story.append(Spacer(1, 8))
@@ -401,7 +482,7 @@ def _build_property_maps(story, styles, lot, map_images):
             pass
 
     # Fallback: programmatic lot diagram
-    if not has_satellite and not has_street and has_geometry:
+    if not has_street and not has_city and not has_context and has_geometry:
         story.append(Paragraph("Lot Boundary Diagram", styles['SubSection']))
         try:
             from app.services.maps import draw_lot_diagram_reportlab

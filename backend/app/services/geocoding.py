@@ -290,6 +290,9 @@ async def _geocode_geosearch(address: str) -> BBLResponse | None:
     lat = coords[1] if len(coords) >= 2 and coords[1] else None
     lng = coords[0] if len(coords) >= 2 and coords[0] else None
 
+    # Extract neighbourhood from Geosearch response
+    neighbourhood = props.get("neighbourhood") or props.get("neighborhood") or None
+
     return BBLResponse(
         bbl=bbl,
         borough=int(bbl[0]),
@@ -297,6 +300,7 @@ async def _geocode_geosearch(address: str) -> BBLResponse | None:
         lot=int(bbl[6:10]),
         latitude=lat,
         longitude=lng,
+        neighbourhood=neighbourhood,
     )
 
 
@@ -381,3 +385,90 @@ async def _geocode_geoservice_1a(
         block=int(bbl[1:6]),
         lot=int(bbl[6:10]),
     )
+
+
+# ──────────────────────────────────────────────────────────────────
+# NEIGHBOURHOOD & CROSS-STREET HELPERS
+# ──────────────────────────────────────────────────────────────────
+
+async def fetch_neighbourhood(address: str) -> str | None:
+    """Look up neighbourhood name via Geosearch API."""
+    try:
+        url = "https://geosearch.planninglabs.nyc/v2/search"
+        params = {"text": address}
+        async with httpx.AsyncClient(timeout=10) as client:
+            resp = await client.get(url, params=params)
+            if resp.status_code != 200:
+                return None
+            data = resp.json()
+        features = data.get("features", [])
+        if not features:
+            return None
+        props = features[0].get("properties", {})
+        return props.get("neighbourhood") or props.get("neighborhood") or None
+    except Exception:
+        return None
+
+
+async def fetch_cross_streets(lat: float, lng: float) -> str | None:
+    """Fetch cross streets using OpenStreetMap Overpass API.
+
+    Queries nearby named streets within 100m of the property and returns
+    the two nearest cross streets (excluding the property's own street).
+    Returns a string like "E 114th St & E 115th St" or None.
+    """
+    try:
+        # Step 1: Get the property's own street via Nominatim reverse geocode
+        own_street = None
+        try:
+            nom_url = "https://nominatim.openstreetmap.org/reverse"
+            nom_params = {"lat": lat, "lon": lng, "format": "json", "zoom": 18}
+            headers = {"User-Agent": "MassingReport/1.0 (zoning analysis)"}
+            async with httpx.AsyncClient(timeout=10) as client:
+                resp = await client.get(nom_url, params=nom_params, headers=headers)
+                if resp.status_code == 200:
+                    own_street = resp.json().get("address", {}).get("road")
+        except Exception:
+            pass
+
+        # Step 2: Query Overpass API for all named streets within 100m
+        overpass_url = "https://overpass-api.de/api/interpreter"
+        query = f'[out:json];way["highway"]["name"](around:100,{lat},{lng});out tags;'
+        headers = {"User-Agent": "MassingReport/1.0 (zoning analysis)"}
+        async with httpx.AsyncClient(timeout=15) as client:
+            resp = await client.post(
+                overpass_url,
+                data={"data": query},
+                headers=headers,
+            )
+            if resp.status_code != 200:
+                return None
+            data = resp.json()
+
+        # Collect unique street names, excluding the property's own street
+        streets = []
+        seen = set()
+        for el in data.get("elements", []):
+            name = el.get("tags", {}).get("name", "")
+            if not name:
+                continue
+            name_lower = name.lower()
+            if name_lower in seen:
+                continue
+            seen.add(name_lower)
+            # Skip the property's own street
+            if own_street and name_lower == own_street.lower():
+                continue
+            streets.append(name)
+
+        if len(streets) >= 2:
+            return f"{streets[0]} & {streets[1]}"
+        elif len(streets) == 1 and own_street:
+            return f"{own_street} & {streets[0]}"
+        elif streets:
+            return streets[0]
+        elif own_street:
+            return own_street
+        return None
+    except Exception:
+        return None

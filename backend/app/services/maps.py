@@ -704,6 +704,91 @@ async def fetch_context_map_image(
     return buf.getvalue()
 
 
+async def fetch_city_overview_map(
+    lat: float,
+    lng: float,
+    width: int = 800,
+    height: int = 500,
+) -> bytes | None:
+    """Fetch a full NYC overview map showing all 5 boroughs with a property marker.
+
+    Uses a fixed bounding box covering the entire NYC metro area so the viewer
+    can see exactly where in the city the property is located.
+    """
+    try:
+        from PIL import Image, ImageDraw, ImageFont
+    except ImportError:
+        logger.warning("Pillow not installed — cannot create city overview map")
+        return None
+
+    # Fixed bbox covering all 5 boroughs of NYC
+    bbox = (-74.30, 40.48, -73.68, 40.93)
+    minx, miny, maxx, maxy = bbox
+
+    # Fetch base street map at city scale
+    base_img = await _fetch_esri_image(ESRI_STREET_URL, bbox, width, height)
+    if not base_img:
+        return None
+
+    img = Image.open(BytesIO(base_img)).convert("RGBA")
+    w, h = img.size
+
+    def geo_to_px(gx: float, gy: float) -> tuple[float, float]:
+        px = (gx - minx) / (maxx - minx) * w
+        py = (maxy - gy) / (maxy - miny) * h
+        return (px, py)
+
+    # Draw a bold marker at the property location
+    overlay = Image.new("RGBA", img.size, (0, 0, 0, 0))
+    draw = ImageDraw.Draw(overlay)
+
+    pin_x, pin_y = geo_to_px(lng, lat)
+
+    # Outer glow ring
+    r_glow = 18
+    draw.ellipse(
+        [pin_x - r_glow, pin_y - r_glow, pin_x + r_glow, pin_y + r_glow],
+        fill=(220, 50, 50, 80),
+    )
+
+    # Main red circle
+    r_outer = 12
+    draw.ellipse(
+        [pin_x - r_outer, pin_y - r_outer, pin_x + r_outer, pin_y + r_outer],
+        fill=(220, 50, 50, 220), outline=(255, 255, 255, 255), width=3,
+    )
+
+    # Inner white dot
+    r_inner = 4
+    draw.ellipse(
+        [pin_x - r_inner, pin_y - r_inner, pin_x + r_inner, pin_y + r_inner],
+        fill=(255, 255, 255, 255),
+    )
+
+    # Label with background
+    label = "Subject Property"
+    try:
+        # Draw label background
+        label_x = pin_x + 18
+        label_y = pin_y - 10
+        draw.rectangle(
+            [label_x - 2, label_y - 2, label_x + 110, label_y + 14],
+            fill=(255, 255, 255, 200),
+        )
+        draw.text(
+            (label_x, label_y), label,
+            fill=(220, 50, 50, 255),
+        )
+    except Exception:
+        pass
+
+    img = Image.alpha_composite(img, overlay)
+    final = img.convert("RGB")
+    buf = BytesIO()
+    final.save(buf, format="PNG")
+    return buf.getvalue()
+
+
 async def _fetch_zoning_districts(
     bbox: tuple[float, float, float, float],
 ) -> dict | None:
