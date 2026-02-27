@@ -11,6 +11,7 @@ from app.config import settings
 from app.api.routes import router
 from app.api.reports_saas import router as reports_saas_router
 from app.api.billing import router as billing_router
+from app.api.lots import router as lots_router
 
 app = FastAPI(
     title="NYC Zoning Feasibility Engine",
@@ -36,6 +37,7 @@ app.include_router(router)
 # SaaS routes (auth-protected)
 app.include_router(reports_saas_router)
 app.include_router(billing_router)
+app.include_router(lots_router)
 
 # Serve massing-viewer (Three.js) built files
 FRONTEND_DIR = os.path.join(os.path.dirname(__file__), "frontend")

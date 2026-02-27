@@ -3,18 +3,36 @@
 import { SignIn, SignUp } from "@clerk/nextjs";
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { CheckCircle2, MapPin, FileText } from "lucide-react";
+import { CheckCircle2, MapPin, FileText, Layers, ArrowRightLeft } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
 const BRAND_GOLD = "#D4A843";
 const BRAND_NAVY = "#2C5F7C";
 
+interface LotSummary {
+  bbl: string;
+  address: string;
+  lot_area: number;
+  zoning_districts: string[];
+  bldgarea: number;
+  builtfar: number;
+  keep_existing_building: boolean;
+}
+
+interface AirRightsData {
+  total_lot_area: number;
+  total_allowable_zfa: number;
+  existing_kept_area: number;
+  developable_zfa: number;
+  development_lot_area: number;
+}
+
 interface PreviewData {
   preview_id: string;
   address: string;
   bbl: string;
-  borough: number;
+  borough?: number;
   lot_area: number;
   zoning_districts: string[];
   buildable_sf: number;
@@ -26,6 +44,10 @@ interface PreviewData {
     breakdown: { range: string; sf: number; rate: number; subtotal: number }[];
     effective_rate: number;
   };
+  is_assemblage?: boolean;
+  lots?: LotSummary[];
+  air_rights?: AirRightsData | null;
+  assemblage_unlocks?: string[];
 }
 
 const CLERK_APPEARANCE = {
@@ -155,33 +177,60 @@ export default function SignInPage() {
           {/* RIGHT: Checkout Preview (only if preview data exists) */}
           {preview && (
             <div className="lg:sticky lg:top-24 space-y-5">
-              {/* Property Summary */}
+              {/* Property / Assemblage Summary */}
               <div className="bg-white rounded-xl border border-gray-200 p-5">
                 <div className="flex items-center gap-2 mb-3">
-                  <MapPin className="w-4 h-4" style={{ color: BRAND_GOLD }} />
+                  {preview.is_assemblage ? (
+                    <Layers className="w-4 h-4" style={{ color: BRAND_GOLD }} />
+                  ) : (
+                    <MapPin className="w-4 h-4" style={{ color: BRAND_GOLD }} />
+                  )}
                   <h2 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">
-                    Your Property
+                    {preview.is_assemblage ? "Your Development Site" : "Your Property"}
                   </h2>
                 </div>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">Address</span>
-                    <span className="font-medium text-gray-900">{preview.address}</span>
+
+                {/* Assemblage badge */}
+                {preview.is_assemblage && preview.lots && (
+                  <div className="mb-3 inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium text-white" style={{ backgroundColor: BRAND_NAVY }}>
+                    <Layers className="w-3 h-3" />
+                    {preview.lots.length} Lots Assembled
                   </div>
+                )}
+
+                <div className="space-y-2 text-sm">
+                  {/* Show individual lots for assemblage */}
+                  {preview.is_assemblage && preview.lots && preview.lots.length > 1 ? (
+                    <>
+                      {preview.lots.map((lot, i) => (
+                        <div key={lot.bbl} className="flex justify-between items-start">
+                          <span className="text-gray-500">Lot {i + 1}</span>
+                          <span className="font-medium text-gray-900 text-right text-xs">
+                            {lot.address || lot.bbl}
+                            {lot.keep_existing_building && (
+                              <span className="ml-1 text-xs px-1.5 py-0.5 rounded bg-amber-100 text-amber-700">Keep Bldg</span>
+                            )}
+                          </span>
+                        </div>
+                      ))}
+                      <div className="border-t border-gray-100 pt-2 mt-2" />
+                    </>
+                  ) : (
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Address</span>
+                      <span className="font-medium text-gray-900">{preview.address}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between">
-                    <span className="text-gray-500">BBL</span>
-                    <span className="font-medium text-gray-900">{preview.bbl}</span>
+                    <span className="text-gray-500">{preview.is_assemblage ? "Combined Area" : "Lot Area"}</span>
+                    <span className="font-medium text-gray-900">
+                      {preview.lot_area?.toLocaleString()} SF
+                    </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-500">Zoning</span>
                     <span className="font-medium text-gray-900">
                       {preview.zoning_districts?.join(", ") || "\u2014"}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">Lot Area</span>
-                    <span className="font-medium text-gray-900">
-                      {preview.lot_area?.toLocaleString()} SF
                     </span>
                   </div>
                   <div className="flex justify-between">
@@ -198,6 +247,38 @@ export default function SignInPage() {
                   </div>
                 </div>
               </div>
+
+              {/* Air Rights Summary (only for assemblage with air rights) */}
+              {preview.air_rights && (
+                <div className="bg-white rounded-xl border border-gray-200 p-5">
+                  <div className="flex items-center gap-2 mb-3">
+                    <ArrowRightLeft className="w-4 h-4" style={{ color: BRAND_GOLD }} />
+                    <h2 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">
+                      Air Rights Transfer
+                    </h2>
+                  </div>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Total Allowable ZFA</span>
+                      <span className="font-medium text-gray-900">
+                        {preview.air_rights.total_allowable_zfa?.toLocaleString()} SF
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Existing Kept Area</span>
+                      <span className="font-medium text-red-600">
+                        -{preview.air_rights.existing_kept_area?.toLocaleString()} SF
+                      </span>
+                    </div>
+                    <div className="flex justify-between border-t border-gray-100 pt-2">
+                      <span className="text-gray-500 font-medium">Developable ZFA</span>
+                      <span className="font-bold" style={{ color: BRAND_NAVY }}>
+                        {preview.air_rights.developable_zfa?.toLocaleString()} SF
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* What You Get */}
               <div className="bg-white rounded-xl border border-gray-200 p-5">

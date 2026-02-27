@@ -222,23 +222,63 @@ def validate_contiguity(
     return _validate_block_adjacency(lots)
 
 
+def _measure_shared_boundary_ft(p1: Polygon, p2: Polygon) -> float:
+    """Measure shared boundary length between two polygons in feet.
+
+    Polygons are in WGS84 (EPSG:4326). We transform to NY State Plane
+    Long Island (EPSG:2263, units in feet) for accurate measurement.
+    """
+    try:
+        from pyproj import Transformer
+        from shapely.ops import transform as shp_transform
+
+        transformer = Transformer.from_crs(
+            "EPSG:4326", "EPSG:2263", always_xy=True
+        )
+        p1_ft = shp_transform(transformer.transform, p1)
+        p2_ft = shp_transform(transformer.transform, p2)
+        shared = p1_ft.boundary.intersection(p2_ft.boundary)
+        return shared.length
+    except ImportError:
+        # Fallback: approximate using NYC latitude
+        # At 40.7°N: 1° longitude ≈ 84,400 m, 1° latitude ≈ 111,320 m
+        shared = p1.boundary.intersection(p2.boundary)
+        # Average conversion at NYC: degrees to feet
+        avg_m_per_deg = (84_400 + 111_320) / 2
+        return shared.length * avg_m_per_deg * 3.28084  # meters → feet
+
+
 def _validate_geometry_contiguity(
     polygons: list[tuple[str, Polygon]],
+    min_boundary_ft: float = 10.0,
 ) -> tuple[bool, str, str]:
-    """Check contiguity using polygon geometry (.touches() or .intersects()).
+    """Check contiguity AND enforce minimum shared boundary per ZR §12-10.
+
+    Per NYC Zoning Resolution Section 12-10, lots must share a common
+    boundary of at least 10 linear feet to qualify for zoning lot merger.
 
     Uses a graph approach: each lot must be reachable from every other
-    lot through shared boundaries.
+    lot through qualifying (≥ min_boundary_ft) shared boundaries.
     """
     n = len(polygons)
-    # Build adjacency graph
+    # Build adjacency graph with boundary length enforcement
     adj = {i: set() for i in range(n)}
+    boundary_lengths = {}  # (i, j) → feet
+
     for i in range(n):
         for j in range(i + 1, n):
-            # Buffer slightly to handle floating point edge alignment
-            p1 = polygons[i][1].buffer(0.5)
-            p2 = polygons[j][1].buffer(0.5)
-            if p1.intersects(p2):
+            p1 = polygons[i][1]
+            p2 = polygons[j][1]
+
+            # Check intersection first (fast)
+            if not p1.buffer(0.5).intersects(p2.buffer(0.5)):
+                continue
+
+            # Measure shared boundary in feet
+            shared_ft = _measure_shared_boundary_ft(p1, p2)
+            boundary_lengths[(i, j)] = shared_ft
+
+            if shared_ft >= min_boundary_ft:
                 adj[i].add(j)
                 adj[j].add(i)
 
@@ -260,11 +300,30 @@ def _validate_geometry_contiguity(
     # Find which lots are disconnected
     disconnected = set(range(n)) - visited
     disconnected_bbls = [polygons[i][0] for i in disconnected]
+
+    # Check if they touch but fail the 10ft requirement
+    short_boundaries = []
+    for (i, j), ft in boundary_lengths.items():
+        if ft < min_boundary_ft:
+            short_boundaries.append(
+                f"{polygons[i][0]} ↔ {polygons[j][0]}: {ft:.1f} ft"
+            )
+
+    detail = (
+        f"Lots are not contiguous. BBL(s) {', '.join(disconnected_bbls)} "
+        f"do not share a qualifying boundary (≥{min_boundary_ft} ft) "
+        f"with any other lot in the set."
+    )
+    if short_boundaries:
+        detail += (
+            f" Insufficient shared boundaries found: "
+            + "; ".join(short_boundaries)
+        )
+
     return (
         False,
         "geometry",
-        f"Lots are not contiguous. BBL(s) {', '.join(disconnected_bbls)} "
-        f"do not share a boundary with any other lot in the set.",
+        detail,
     )
 
 

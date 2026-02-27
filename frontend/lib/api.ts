@@ -103,3 +103,36 @@ export async function getPortalUrl(token: string | null) {
     token,
   });
 }
+
+// ── Lot & Assemblage API ──
+
+// Look up a single lot by address or BBL
+export async function lookupLot(
+  token: string | null,
+  params: { address?: string; bbl?: string }
+) {
+  const qs = new URLSearchParams();
+  if (params.address) qs.set("address", params.address);
+  if (params.bbl) qs.set("bbl", params.bbl);
+  return apiRequest(`/api/v1/saas/lots/lookup?${qs.toString()}`, { token });
+}
+
+// Get adjacent lots for a given BBL
+export async function getAdjacentLots(
+  token: string | null,
+  bbl: string
+) {
+  return apiRequest(`/api/v1/saas/lots/adjacent/${bbl}`, { token });
+}
+
+// Preview an assemblage (multi-lot with optional air rights)
+export async function previewAssemblage(
+  token: string | null,
+  lots: { bbl: string; keep_existing_building: boolean }[]
+) {
+  return apiRequest("/api/v1/saas/reports/preview-assemblage", {
+    method: "POST",
+    token,
+    body: JSON.stringify({ lots }),
+  });
+}

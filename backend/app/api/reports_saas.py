@@ -455,3 +455,288 @@ async def download_report_pdf(report_id: str, user: UserInfo = Depends(get_curre
         media_type="application/pdf",
         filename=filename,
     )
+
+# ── POST /preview-assemblage ──
+# (Append this to the end of reports_saas.py)
+
+class LotInput(BaseModel):
+    bbl: str
+    keep_existing_building: bool = False
+
+class AssemblagePreviewRequest(BaseModel):
+    lots: list[LotInput]
+
+
+@router.post("/preview-assemblage")
+async def preview_assemblage(
+    req: AssemblagePreviewRequest,
+    user: UserInfo | None = Depends(get_optional_user),
+):
+    """Multi-lot assemblage preview with air rights support.
+
+    Accepts 1+ lots. If a single lot with no keep_existing_building,
+    delegates to the standard single-lot preview.
+
+    For multi-lot requests:
+      1. Resolves each lot (geocode, PLUTO, geometry)
+      2. Validates contiguity (≥10ft shared boundary per ZR §12-10)
+      3. Merges lots into a single development site
+      4. Runs zoning calculation on merged site
+      5. If any lots keep their building, applies air rights deduction
+      6. Returns combined preview with pricing
+    """
+    if not req.lots:
+        raise HTTPException(status_code=400, detail="At least one lot is required.")
+
+    # Validate: at least one lot must NOT keep existing building
+    if all(lot.keep_existing_building for lot in req.lots):
+        raise HTTPException(
+            status_code=400,
+            detail="At least one lot must be designated for development "
+                   "(not keeping existing building).",
+        )
+
+    from app.api.lots import resolve_lot
+    from app.zoning_engine.assemblage import merge_lots, validate_contiguity
+    from app.zoning_engine.air_rights import calculate_air_rights, adjust_scenarios_for_air_rights
+
+    # ── Resolve each lot ──
+    lot_profiles = []
+    lot_geometries = []
+    for lot_input in req.lots:
+        lot_profile, geom = await resolve_lot(bbl=lot_input.bbl)
+        lot_profiles.append(lot_profile)
+        lot_geometries.append(geom)
+
+    keep_flags = [lot_input.keep_existing_building for lot_input in req.lots]
+    is_assemblage = len(lot_profiles) > 1
+    has_air_rights = any(keep_flags)
+
+    # ── Single lot, no air rights → standard flow ──
+    if len(lot_profiles) == 1 and not has_air_rights:
+        lot = lot_profiles[0]
+        calc_result = calculator.calculate(lot)
+        env = calc_result["zoning_envelope"]
+        scenarios = calc_result["scenarios"]
+
+        # Billing
+        lot_area = lot.lot_area or 0
+        billing_far = max(env.residential_far or 0, env.commercial_far or 0)
+        billing_sf = lot_area * billing_far
+        pricing = calculate_price(billing_sf)
+
+        scenario_summaries = _build_scenario_summaries(scenarios)
+
+        preview_id = str(uuid.uuid4())
+        _preview_cache[preview_id] = {
+            "analysis": {
+                "bbl_result": None,
+                "lot_profile": lot,
+                "calc_result": calc_result,
+                "zoning_envelope": env,
+                "scenarios": scenarios,
+                "geometry": lot_geometries[0],
+                "primary_district": lot.zoning_districts[0] if lot.zoning_districts else "",
+            },
+            "pricing": pricing,
+            "is_assemblage": False,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "user_id": user.clerk_user_id if user else "anonymous",
+        }
+
+        return {
+            "preview_id": preview_id,
+            "is_assemblage": False,
+            "lots": [_lot_summary(lot, False)],
+            "address": lot.address or "",
+            "bbl": lot.bbl,
+            "lot_area": lot.lot_area,
+            "zoning_districts": lot.zoning_districts,
+            "buildable_sf": max(
+                (s.zoning_floor_area or s.total_gross_sf or 0) for s in scenarios
+            ) if scenarios else 0,
+            "scenarios": scenario_summaries,
+            "pricing": pricing,
+            "air_rights": None,
+            "assemblage_unlocks": [],
+            "zoning_envelope": _envelope_dict(env),
+        }
+
+    # ── Multi-lot / air rights flow ──
+
+    # Validate contiguity
+    if is_assemblage:
+        is_contiguous, method, detail = validate_contiguity(lot_profiles)
+        if not is_contiguous:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Lots are not contiguous: {detail}",
+            )
+
+    # Merge lots
+    if is_assemblage:
+        merged_lot, merge_warnings = merge_lots(lot_profiles)
+    else:
+        # Single lot with air rights (keep building checked but only 1 lot)
+        merged_lot = lot_profiles[0]
+        merge_warnings = []
+
+    # Run zoning calculation on merged site
+    try:
+        calc_result = calculator.calculate(merged_lot)
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Zoning calculation error for merged site: {e}",
+        )
+
+    env = calc_result["zoning_envelope"]
+    scenarios = calc_result["scenarios"]
+
+    # Air rights deduction
+    merged_area = merged_lot.lot_area or 0
+    air_rights_result = None
+    if has_air_rights:
+        air_rights_result = calculate_air_rights(
+            lot_profiles, keep_flags, env, merged_area,
+        )
+        scenarios = adjust_scenarios_for_air_rights(scenarios, air_rights_result)
+
+    # Billing: based on developable ZFA
+    if air_rights_result:
+        billing_sf = air_rights_result.developable_zfa
+    else:
+        billing_far = max(env.residential_far or 0, env.commercial_far or 0)
+        billing_sf = merged_area * billing_far
+    pricing = calculate_price(billing_sf)
+
+    # Build scenario summaries
+    scenario_summaries = _build_scenario_summaries(scenarios)
+
+    # Assemblage unlocks from delta analysis
+    unlocks = []
+    if is_assemblage:
+        try:
+            from app.zoning_engine.assemblage import (
+                identify_key_unlocks, calculate_delta,
+            )
+            # Run individual analyses for comparison
+            individual_analyses = []
+            for lp in lot_profiles:
+                try:
+                    individual_analyses.append(calculator.calculate(lp))
+                except Exception:
+                    individual_analyses.append(None)
+
+            delta = calculate_delta(
+                individual_lots=lot_profiles,
+                individual_analyses=individual_analyses,
+                merged_lot=merged_lot,
+                merged_analysis=calc_result,
+            )
+            unlocks = delta.key_unlocks if delta else []
+        except Exception:
+            pass
+
+    # Build lot summaries
+    lot_summaries = [
+        _lot_summary(lp, kf)
+        for lp, kf in zip(lot_profiles, keep_flags)
+    ]
+
+    # Cache
+    preview_id = str(uuid.uuid4())
+    _preview_cache[preview_id] = {
+        "analysis": {
+            "bbl_result": None,
+            "lot_profile": merged_lot,
+            "calc_result": calc_result,
+            "zoning_envelope": env,
+            "scenarios": scenarios,
+            "geometry": merged_lot.geometry,
+            "primary_district": merged_lot.zoning_districts[0] if merged_lot.zoning_districts else "",
+        },
+        "pricing": pricing,
+        "is_assemblage": is_assemblage,
+        "assemblage_data": {
+            "individual_lots": lot_profiles,
+            "individual_geometries": lot_geometries,
+            "merged_lot": merged_lot,
+            "keep_flags": keep_flags,
+            "air_rights": air_rights_result.to_dict() if air_rights_result else None,
+            "unlocks": unlocks,
+            "warnings": merge_warnings,
+        } if is_assemblage or has_air_rights else None,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "user_id": user.clerk_user_id if user else "anonymous",
+    }
+
+    # Response
+    buildable_sf = max(
+        (s.zoning_floor_area or s.total_gross_sf or 0) for s in scenarios
+    ) if scenarios else 0
+
+    return {
+        "preview_id": preview_id,
+        "is_assemblage": is_assemblage,
+        "lots": lot_summaries,
+        "address": merged_lot.address or "",
+        "bbl": merged_lot.bbl,
+        "lot_area": merged_area,
+        "zoning_districts": merged_lot.zoning_districts,
+        "buildable_sf": buildable_sf,
+        "scenarios": scenario_summaries,
+        "pricing": pricing,
+        "air_rights": air_rights_result.to_dict() if air_rights_result else None,
+        "assemblage_unlocks": unlocks,
+        "warnings": merge_warnings,
+        "zoning_envelope": _envelope_dict(env),
+    }
+
+
+# ── Helper functions ──
+
+def _lot_summary(lot: LotProfile, keep_building: bool) -> dict:
+    """Build a summary dict for one lot."""
+    return {
+        "bbl": lot.bbl,
+        "address": lot.address or "",
+        "lot_area": lot.lot_area or 0,
+        "lot_frontage": lot.lot_frontage or 0,
+        "lot_depth": lot.lot_depth or 0,
+        "zoning_districts": lot.zoning_districts,
+        "bldgarea": (lot.pluto.bldgarea if lot.pluto else 0) or 0,
+        "builtfar": (lot.pluto.builtfar if lot.pluto else 0) or 0,
+        "numfloors": (lot.pluto.numfloors if lot.pluto else 0) or 0,
+        "yearbuilt": (lot.pluto.yearbuilt if lot.pluto else 0) or 0,
+        "keep_existing_building": keep_building,
+    }
+
+
+def _envelope_dict(env) -> dict:
+    """Convert ZoningEnvelope to JSON-serializable dict."""
+    return {
+        "residential_far": env.residential_far,
+        "commercial_far": env.commercial_far,
+        "cf_far": env.cf_far,
+        "max_building_height": env.max_building_height,
+        "lot_coverage_max": env.lot_coverage_max,
+        "quality_housing": env.quality_housing,
+    }
+
+
+def _build_scenario_summaries(scenarios) -> list[dict]:
+    """Build scenario summary dicts for API response."""
+    summaries = []
+    for s in scenarios:
+        summaries.append({
+            "name": s.name,
+            "total_zfa": s.zoning_floor_area,
+            "max_height_ft": s.max_height_ft,
+            "num_floors": s.num_floors,
+            "total_units": s.total_units,
+            "residential_sf": s.residential_sf,
+            "commercial_sf": s.commercial_sf,
+            "far_used": s.far_used,
+        })
+    return summaries

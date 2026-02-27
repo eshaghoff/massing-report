@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
 import {
   MapPin,
@@ -32,51 +31,6 @@ const BRAND_GOLD = "#D4A843";
 const BRAND_NAVY = "#2C5F7C";
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8321";
 
-interface Scenario {
-  name: string;
-  total_zfa: number;
-  max_height_ft: number;
-  num_floors: number;
-  total_units: number;
-  residential_sf: number;
-  commercial_sf: number;
-  far_used: number;
-}
-
-interface PricingBreakdown {
-  range: string;
-  sf: number;
-  rate: number;
-  subtotal: number;
-}
-
-interface PreviewData {
-  preview_id: string;
-  address: string;
-  bbl: string;
-  borough: number;
-  lot_area: number;
-  lot_frontage: number;
-  lot_depth: number;
-  zoning_districts: string[];
-  buildable_sf: number;
-  scenarios: Scenario[];
-  pricing: {
-    buildable_sf: number;
-    price_cents: number;
-    price_dollars: number;
-    breakdown: PricingBreakdown[];
-    effective_rate: number;
-  };
-  zoning_envelope: {
-    residential_far: number;
-    commercial_far: number;
-    cf_far: number;
-    max_building_height: number;
-    lot_coverage_max: number;
-    quality_housing: boolean;
-  };
-}
 
 const FEATURES = [
   {
@@ -147,59 +101,6 @@ const FEATURES = [
 ];
 
 export default function LandingPage() {
-  const [address, setAddress] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [preview, setPreview] = useState<PreviewData | null>(null);
-
-  async function handleAnalyze(e: React.FormEvent) {
-    e.preventDefault();
-    if (!address.trim()) return;
-
-    setLoading(true);
-    setError("");
-    setPreview(null);
-
-    try {
-      const res = await fetch(`${API_URL}/api/v1/saas/reports/preview`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ address: address.trim() }),
-      });
-
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.detail || "Analysis failed. Please try again.");
-      }
-
-      const data: PreviewData = await res.json();
-      setPreview(data);
-
-      // Scroll to results
-      setTimeout(() => {
-        document.getElementById("results")?.scrollIntoView({ behavior: "smooth" });
-      }, 100);
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Something went wrong");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  function handleGetReport() {
-    if (!preview) return;
-    // Store preview in localStorage for checkout page to resume
-    localStorage.setItem("massing_preview", JSON.stringify(preview));
-    // Redirect to sign-up which will redirect to checkout after auth
-    window.location.href = "/sign-up?redirect_url=/checkout";
-  }
-
-  const maxHeight = preview
-    ? Math.max(...preview.scenarios.map((s) => s.max_height_ft))
-    : 0;
-  const maxUnits = preview
-    ? Math.max(...preview.scenarios.map((s) => s.total_units))
-    : 0;
 
   return (
     <div className="min-h-screen bg-white">
@@ -223,7 +124,7 @@ export default function LandingPage() {
               Sign In
             </Link>
             <Link
-              href="/sign-up"
+              href="/start"
               className="text-sm px-4 py-2 rounded-lg text-white font-medium"
               style={{ backgroundColor: BRAND_GOLD }}
             >
@@ -253,197 +154,27 @@ export default function LandingPage() {
             report in seconds.
           </p>
 
-          {/* Inline Address Search */}
-          <form onSubmit={handleAnalyze} className="mt-10 max-w-2xl mx-auto">
-            <div className="flex gap-2">
-              <div className="flex-1 relative">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                <input
-                  type="text"
-                  value={address}
-                  onChange={(e) => setAddress(e.target.value)}
-                  placeholder="Enter any New York City address or BBL..."
-                  className="w-full pl-12 pr-4 py-4 border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#D4A843] focus:border-transparent text-lg"
-                />
-              </div>
-              <button
-                type="submit"
-                disabled={loading || !address.trim()}
-                className="px-8 py-4 rounded-lg text-white font-semibold text-lg shadow-lg hover:shadow-xl transition whitespace-nowrap disabled:opacity-50"
-                style={{ backgroundColor: BRAND_GOLD }}
-              >
-                {loading ? "Analyzing..." : "Select Property"}
-              </button>
-            </div>
-            {error && (
-              <div className="mt-3 bg-red-50 border border-red-200 rounded-lg p-3 flex items-start gap-2 text-left">
-                <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
-                <div>
-                  <p className="text-red-700 text-sm font-medium">{error}</p>
-                  <p className="text-red-500 text-xs mt-1">
-                    Accepted formats: street address (e.g. &quot;120 Broadway&quot;) or 10-digit BBL (e.g. &quot;1000477501&quot;)
-                  </p>
-                </div>
-              </div>
-            )}
-          </form>
-
-          {/* Loading State */}
-          {loading && (
-            <div className="mt-8 py-12">
-              <div className="animate-spin w-8 h-8 border-4 border-white/30 border-t-[#D4A843] rounded-full mx-auto mb-4" />
-              <p className="text-white/70">
-                Running zoning analysis... This takes a few seconds.
-              </p>
-            </div>
-          )}
+          {/* Get Started CTA */}
+          <div className="mt-10">
+            <Link
+              href="/start"
+              className="inline-flex items-center gap-3 px-12 py-5 rounded-lg text-white font-semibold text-xl shadow-lg hover:shadow-xl hover:opacity-90 transition"
+              style={{ backgroundColor: BRAND_GOLD }}
+            >
+              Get Started
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
+              </svg>
+            </Link>
+            <p className="mt-4 text-white/60 text-sm">
+              No account required to preview your analysis
+            </p>
+          </div>
         </div>
       </section>
 
-      {/* Analysis Results (shown after search) */}
-      {preview && !loading && (
-        <section id="results" className="bg-gray-50 border-y border-gray-200 py-12">
-          <div className="max-w-5xl mx-auto px-6 space-y-6">
-            {/* Property Summary */}
-            <div className="bg-white rounded-lg border border-gray-200 p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">
-                Property Summary
-              </h2>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div>
-                  <p className="text-xs text-gray-500 uppercase tracking-wide">
-                    Address
-                  </p>
-                  <p className="font-medium text-gray-900 text-sm">{preview.address}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-500 uppercase tracking-wide">BBL</p>
-                  <p className="font-medium text-gray-900 text-sm">{preview.bbl}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-500 uppercase tracking-wide">Zoning</p>
-                  <p className="font-medium text-gray-900 text-sm">
-                    {preview.zoning_districts?.join(", ") || "\u2014"}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-500 uppercase tracking-wide">Lot Area</p>
-                  <p className="font-medium text-gray-900 text-sm">
-                    {preview.lot_area?.toLocaleString()} SF
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Key Metrics */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="bg-white rounded-lg border border-gray-200 p-5 text-center">
-                <p className="text-sm text-gray-500">Max Buildable SF</p>
-                <p className="text-2xl font-bold text-gray-900 mt-1">
-                  {preview.buildable_sf.toLocaleString()}
-                </p>
-              </div>
-              <div className="bg-white rounded-lg border border-gray-200 p-5 text-center">
-                <p className="text-sm text-gray-500">Max Height</p>
-                <p className="text-2xl font-bold text-gray-900 mt-1">{maxHeight} ft</p>
-              </div>
-              <div className="bg-white rounded-lg border border-gray-200 p-5 text-center">
-                <p className="text-sm text-gray-500">Max Units</p>
-                <p className="text-2xl font-bold text-gray-900 mt-1">{maxUnits}</p>
-              </div>
-            </div>
-
-            {/* Scenarios */}
-            <div className="bg-white rounded-lg border border-gray-200 p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">
-                Development Scenarios
-              </h2>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="text-left text-gray-500 border-b">
-                      <th className="pb-2 font-medium">Scenario</th>
-                      <th className="pb-2 font-medium text-right">ZFA</th>
-                      <th className="pb-2 font-medium text-right">Height</th>
-                      <th className="pb-2 font-medium text-right">Floors</th>
-                      <th className="pb-2 font-medium text-right">Units</th>
-                      <th className="pb-2 font-medium text-right">FAR</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {preview.scenarios.map((s) => (
-                      <tr key={s.name} className="border-b border-gray-100">
-                        <td className="py-2.5 text-gray-900 font-medium">{s.name}</td>
-                        <td className="py-2.5 text-right text-gray-700">
-                          {s.total_zfa?.toLocaleString()}
-                        </td>
-                        <td className="py-2.5 text-right text-gray-700">
-                          {s.max_height_ft}&apos;
-                        </td>
-                        <td className="py-2.5 text-right text-gray-700">{s.num_floors}</td>
-                        <td className="py-2.5 text-right text-gray-700">{s.total_units}</td>
-                        <td className="py-2.5 text-right text-gray-700">
-                          {s.far_used?.toFixed(2)}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            {/* Price + CTA */}
-            <div className="rounded-lg p-6 text-white" style={{ backgroundColor: BRAND_NAVY }}>
-              <div className="flex items-center justify-between flex-wrap gap-4">
-                <div>
-                  <h2 className="text-lg font-semibold mb-1">
-                    Full Feasibility Report
-                  </h2>
-                  <p className="text-white/70 text-sm">
-                    Professional PDF with zoning maps, 3D massing, building
-                    programs, and detailed calculations.
-                  </p>
-                  {preview.pricing?.breakdown && (
-                    <div className="mt-3 text-xs text-white/60 space-y-0.5">
-                      {preview.pricing.breakdown.map(
-                        (b: PricingBreakdown, i: number) => (
-                          <p key={i}>
-                            {b.range}: {b.sf.toLocaleString()} SF @ $
-                            {b.rate.toFixed(2)}/SF = ${b.subtotal.toLocaleString()}
-                          </p>
-                        )
-                      )}
-                      <p className="mt-1 text-white/50">
-                        Effective rate: ${preview.pricing.effective_rate.toFixed(4)}/SF
-                      </p>
-                    </div>
-                  )}
-                </div>
-                <div className="text-right flex-shrink-0">
-                  <p className="text-3xl font-bold">
-                    $
-                    {(preview.pricing?.price_cents / 100).toLocaleString(
-                      undefined,
-                      { minimumFractionDigits: 2 }
-                    )}
-                  </p>
-                  <button
-                    onClick={handleGetReport}
-                    className="mt-3 px-8 py-3 rounded-lg font-semibold text-sm hover:opacity-90 transition"
-                    style={{ backgroundColor: BRAND_GOLD }}
-                  >
-                    Generate Report
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-      )}
-
       {/* Value Props Banner */}
-      {!preview && (
-        <section className="bg-white border-b-2" style={{ borderColor: `${BRAND_GOLD}30` }}>
+      <section className="bg-white border-b-2" style={{ borderColor: `${BRAND_GOLD}30` }}>
           <div className="max-w-5xl mx-auto px-6 py-10">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-center">
               <div className="flex flex-col items-center gap-2">
@@ -482,7 +213,6 @@ export default function LandingPage() {
             </div>
           </div>
         </section>
-      )}
 
       {/* How It Works */}
       <section className="py-20 bg-white">

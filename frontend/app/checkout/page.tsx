@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useAuthToken } from "@/lib/use-auth";
-import { CheckCircle2, FileText, Loader2, AlertCircle, ArrowLeft } from "lucide-react";
+import { CheckCircle2, FileText, Loader2, AlertCircle, ArrowLeft, Layers, ArrowRightLeft } from "lucide-react";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8321";
 const BRAND_GOLD = "#D4A843";
@@ -27,14 +27,32 @@ interface PricingBreakdown {
   subtotal: number;
 }
 
+interface LotSummary {
+  bbl: string;
+  address: string;
+  lot_area: number;
+  zoning_districts: string[];
+  bldgarea: number;
+  builtfar: number;
+  keep_existing_building: boolean;
+}
+
+interface AirRightsData {
+  total_lot_area: number;
+  total_allowable_zfa: number;
+  existing_kept_area: number;
+  developable_zfa: number;
+  development_lot_area: number;
+}
+
 interface PreviewData {
   preview_id: string;
   address: string;
   bbl: string;
-  borough: number;
+  borough?: number;
   lot_area: number;
-  lot_frontage: number;
-  lot_depth: number;
+  lot_frontage?: number;
+  lot_depth?: number;
   zoning_districts: string[];
   buildable_sf: number;
   scenarios: Scenario[];
@@ -45,7 +63,7 @@ interface PreviewData {
     breakdown: PricingBreakdown[];
     effective_rate: number;
   };
-  zoning_envelope: {
+  zoning_envelope?: {
     residential_far: number;
     commercial_far: number;
     cf_far: number;
@@ -53,6 +71,10 @@ interface PreviewData {
     lot_coverage_max: number;
     quality_housing: boolean;
   };
+  is_assemblage?: boolean;
+  lots?: LotSummary[];
+  air_rights?: AirRightsData | null;
+  assemblage_unlocks?: string[];
 }
 
 type CheckoutStep = "confirm" | "generating" | "complete" | "error";
@@ -173,6 +195,11 @@ export default function CheckoutPage() {
     }
   }
 
+  // Helper: display name for the property/assemblage
+  const displayName = preview?.is_assemblage && preview.lots && preview.lots.length > 1
+    ? `${preview.lots.length}-Lot Assemblage`
+    : preview?.address || "";
+
   if (!isLoaded) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -242,24 +269,62 @@ export default function CheckoutPage() {
                 Generate Your Report
               </h1>
               <p className="text-gray-600">
-                Review your property details and confirm to generate the full report.
+                Review your {preview.is_assemblage ? "development site" : "property"} details and confirm to generate the full report.
               </p>
             </div>
 
-            {/* Property Summary Card */}
+            {/* Property / Assemblage Summary Card */}
             <div className="bg-white rounded-xl border border-gray-200 p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">
-                Property Summary
-              </h2>
+              <div className="flex items-center gap-2 mb-4">
+                {preview.is_assemblage ? (
+                  <Layers className="w-5 h-5" style={{ color: BRAND_GOLD }} />
+                ) : null}
+                <h2 className="text-lg font-semibold text-gray-900">
+                  {preview.is_assemblage ? "Development Site Summary" : "Property Summary"}
+                </h2>
+              </div>
+
+              {/* Assemblage badge */}
+              {preview.is_assemblage && preview.lots && (
+                <div className="mb-4 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium text-white" style={{ backgroundColor: BRAND_NAVY }}>
+                  <Layers className="w-3 h-3" />
+                  {preview.lots.length} Lots Assembled &bull; {preview.lot_area?.toLocaleString()} SF Combined
+                </div>
+              )}
+
+              {/* Individual lots for assemblage */}
+              {preview.is_assemblage && preview.lots && preview.lots.length > 1 && (
+                <div className="mb-4 space-y-2">
+                  {preview.lots.map((lot, i) => (
+                    <div key={lot.bbl} className="flex items-center justify-between py-2 px-3 bg-gray-50 rounded-lg text-sm">
+                      <div>
+                        <span className="font-medium text-gray-900">{lot.address || lot.bbl}</span>
+                        <span className="ml-2 text-gray-400 text-xs">{lot.bbl}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-gray-500 text-xs">{lot.lot_area?.toLocaleString()} SF</span>
+                        {lot.keep_existing_building && (
+                          <span className="text-xs px-2 py-0.5 rounded bg-amber-100 text-amber-700 font-medium">Keep Building</span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
               <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-xs text-gray-500 uppercase tracking-wide">Address</p>
-                  <p className="font-medium text-gray-900">{preview.address}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-500 uppercase tracking-wide">BBL</p>
-                  <p className="font-medium text-gray-900">{preview.bbl}</p>
-                </div>
+                {!preview.is_assemblage && (
+                  <>
+                    <div>
+                      <p className="text-xs text-gray-500 uppercase tracking-wide">Address</p>
+                      <p className="font-medium text-gray-900">{preview.address}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500 uppercase tracking-wide">BBL</p>
+                      <p className="font-medium text-gray-900">{preview.bbl}</p>
+                    </div>
+                  </>
+                )}
                 <div>
                   <p className="text-xs text-gray-500 uppercase tracking-wide">Zoning</p>
                   <p className="font-medium text-gray-900">
@@ -267,7 +332,7 @@ export default function CheckoutPage() {
                   </p>
                 </div>
                 <div>
-                  <p className="text-xs text-gray-500 uppercase tracking-wide">Lot Area</p>
+                  <p className="text-xs text-gray-500 uppercase tracking-wide">{preview.is_assemblage ? "Combined Area" : "Lot Area"}</p>
                   <p className="font-medium text-gray-900">
                     {preview.lot_area?.toLocaleString()} SF
                   </p>
@@ -286,6 +351,33 @@ export default function CheckoutPage() {
                 </div>
               </div>
             </div>
+
+            {/* Air Rights Card (only for assemblage with air rights) */}
+            {preview.air_rights && (
+              <div className="bg-white rounded-xl border border-gray-200 p-6">
+                <div className="flex items-center gap-2 mb-4">
+                  <ArrowRightLeft className="w-5 h-5" style={{ color: BRAND_GOLD }} />
+                  <h2 className="text-lg font-semibold text-gray-900">Air Rights Transfer</h2>
+                </div>
+                <div className="grid grid-cols-3 gap-4 text-center">
+                  <div>
+                    <p className="text-xs text-gray-500 uppercase tracking-wide">Total Allowable</p>
+                    <p className="text-xl font-bold text-gray-900">{preview.air_rights.total_allowable_zfa?.toLocaleString()}</p>
+                    <p className="text-xs text-gray-400">SF</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500 uppercase tracking-wide">Kept Buildings</p>
+                    <p className="text-xl font-bold text-red-600">-{preview.air_rights.existing_kept_area?.toLocaleString()}</p>
+                    <p className="text-xs text-gray-400">SF</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500 uppercase tracking-wide">Developable</p>
+                    <p className="text-xl font-bold" style={{ color: BRAND_NAVY }}>{preview.air_rights.developable_zfa?.toLocaleString()}</p>
+                    <p className="text-xs text-gray-400">SF</p>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Pricing Card */}
             <div
@@ -371,7 +463,13 @@ export default function CheckoutPage() {
             <h1 className="text-2xl font-bold text-gray-900 mb-2">
               Generating Your Report
             </h1>
-            <p className="text-gray-500 mb-4">{preview.address}</p>
+            <p className="text-gray-500 mb-4">{displayName}</p>
+            {preview.is_assemblage && preview.lots && (
+              <p className="text-xs text-gray-400 mb-2">
+                {preview.lots.length} lots &bull; {preview.lot_area?.toLocaleString()} SF combined
+                {preview.air_rights ? ` \u2022 Air rights transfer` : ""}
+              </p>
+            )}
             <p className="text-sm text-gray-400">{reportStatus}</p>
             <div className="mt-8 max-w-sm mx-auto space-y-3">
               {[
@@ -393,7 +491,7 @@ export default function CheckoutPage() {
               ))}
             </div>
             <p className="mt-8 text-xs text-gray-400">
-              This usually takes 2–5 minutes. You can leave this page — we&apos;ll save your report.
+              This usually takes 2\u20135 minutes. You can leave this page \u2014 we&apos;ll save your report.
             </p>
           </div>
         )}
@@ -410,7 +508,7 @@ export default function CheckoutPage() {
             <h1 className="text-3xl font-bold text-gray-900 mb-2">
               Your Report Is Ready!
             </h1>
-            <p className="text-gray-600 mb-8">{preview.address}</p>
+            <p className="text-gray-600 mb-8">{displayName}</p>
             <div className="flex flex-col items-center gap-4">
               <button
                 onClick={handleDownload}
