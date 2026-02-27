@@ -72,7 +72,8 @@ export default function CheckoutPage() {
     const stored = localStorage.getItem("massing_preview");
     if (stored) {
       try {
-        setPreview(JSON.parse(stored));
+        const parsed = JSON.parse(stored);
+        setPreview(parsed);
       } catch {
         setError("Could not load your analysis. Please try again from the home page.");
       }
@@ -80,6 +81,14 @@ export default function CheckoutPage() {
       setError("No analysis found. Please start from the home page.");
     }
   }, []);
+
+  // Auto-trigger generation when preview is loaded and auth is ready
+  useEffect(() => {
+    if (preview && isLoaded && step === "confirm" && !reportId) {
+      handleGenerate();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [preview, isLoaded]);
 
   // Poll for report completion
   const pollStatus = useCallback(

@@ -151,12 +151,17 @@ async def preview_report(req: PreviewRequest, user: UserInfo | None = Depends(ge
     envelope = analysis["zoning_envelope"]
     scenarios = analysis["scenarios"]
 
-    # Buildable SF = max ZFA across scenarios
+    # Buildable SF = max ZFA across scenarios (for display)
     max_zfa = max((s.zoning_floor_area or s.total_gross_sf or 0) for s in scenarios) if scenarios else 0
     buildable_sf = max_zfa
 
-    # Calculate price
-    pricing = calculate_price(buildable_sf)
+    # Billing SF = lot_area × max(residential_far, commercial_far) — excludes CF FAR
+    lot_area = lot.lot_area or 0
+    billing_far = max(envelope.residential_far or 0, envelope.commercial_far or 0)
+    billing_sf = lot_area * billing_far
+
+    # Calculate price based on billing SF (not raw max ZFA)
+    pricing = calculate_price(billing_sf)
 
     # Build scenario summaries
     scenario_summaries = []
@@ -358,18 +363,18 @@ async def _generate_report_task(report_id: str, req: GenerateRequest, user: User
             massing_models=massing_models,
         )
 
-        # Pricing
-        max_zfa = max(
-            (s.zoning_floor_area or s.total_gross_sf or 0) for s in scenarios
-        ) if scenarios else 0
-        pricing = calculate_price(max_zfa)
+        # Pricing — billing SF = lot_area × max(res_far, comm_far), excludes CF
+        lot_area_val = lot_profile.lot_area or 0
+        billing_far = max(zoning_envelope.residential_far or 0, zoning_envelope.commercial_far or 0)
+        billing_sf = lot_area_val * billing_far
+        pricing = calculate_price(billing_sf)
 
         # Update record
         _reports[report_id].update({
             "bbl": lot_profile.bbl,
             "address": lot_profile.address or "",
             "status": "completed",
-            "buildable_sf": max_zfa,
+            "buildable_sf": billing_sf,
             "price_cents": pricing["price_cents"],
             "pdf_path": pdf_path,
             "scenarios_count": len(scenarios),

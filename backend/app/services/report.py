@@ -1,15 +1,15 @@
 """
 PDF report generator for zoning feasibility analysis.
-Uses ReportLab to generate professional reports with West Egg Development branding.
+Uses ReportLab to generate professional reports with Massing Report branding.
 
 Sections:
-  1.  Cover Page (with West Egg Development branding + satellite thumbnail)
+  1.  Cover Page (with Massing Report branding + satellite thumbnail)
   2.  Property Maps (satellite + street)
   3.  Site Summary (two-column layout)
   4.  Key Development Features (highlighted callout cards)
   5.  Zoning Overview (with zoning map)
   6.  Detailed Calculations (FAR, units, height breakdowns)
-  7.  Development Scenarios (with 3D massing renderings)
+  7.  Development Scenarios (with 3D massing, highlight badges, analyst manifest)
   8.  Scenario Comparison Table
   9.  Parking Analysis
   10. Assemblage Analysis (if applicable)
@@ -53,6 +53,8 @@ HIGHLIGHT_BORDER = colors.HexColor('#4A90D9')
 FEATURE_BG = colors.HexColor('#f7f9fc')
 GOLD = colors.HexColor('#D4A017')
 GOLD_LIGHT = colors.HexColor('#FFF8E1')
+BADGE_BLUE = colors.HexColor('#E8F0FE')
+BADGE_GREEN = colors.HexColor('#E6F4EA')
 WHITE = colors.white
 
 PAGE_W, PAGE_H = letter
@@ -65,7 +67,7 @@ CONTENT_W = PAGE_W - 2 * MARGIN  # ~504 pt ≈ 7 inches
 # ──────────────────────────────────────────────────────────────────
 
 def _draw_logo(canvas, x, y, size="small"):
-    """Draw the West Egg Development logo on the canvas.
+    """Draw the Massing Report logo on the canvas.
 
     *x, y* is the left-centre of the gold circle.
     """
@@ -79,15 +81,15 @@ def _draw_logo(canvas, x, y, size="small"):
     canvas.setFillColor(GOLD)
     canvas.circle(x + r, y, r, fill=1, stroke=0)
 
-    # "WE" inside circle
+    # "MR" inside circle
     canvas.setFillColor(WHITE)
     canvas.setFont('Helvetica-Bold', fs)
-    canvas.drawCentredString(x + r, y - fs * 0.35, "WE")
+    canvas.drawCentredString(x + r, y - fs * 0.35, "MR")
 
     # Company name
     canvas.setFillColor(DARK)
     canvas.setFont('Helvetica-Bold', ls)
-    canvas.drawString(x + r * 2 + gap * 0.4, y - ls * 0.35, "WEST EGG DEVELOPMENT")
+    canvas.drawString(x + r * 2 + gap * 0.4, y - ls * 0.35, "MASSING REPORT")
     canvas.restoreState()
 
 
@@ -181,6 +183,10 @@ def _get_styles():
     styles.add(ParagraphStyle(
         name='BigNumber', fontSize=18, fontName='Helvetica-Bold',
         textColor=BLUE, alignment=TA_CENTER, spaceAfter=4,
+    ))
+    styles.add(ParagraphStyle(
+        name='SubSectionItalic', fontSize=10, fontName='Helvetica-BoldOblique',
+        spaceAfter=3, spaceBefore=4, textColor=BLUE_DARK,
     ))
     return styles
 
@@ -318,7 +324,7 @@ def _build_cover_page(story, styles, lot, env, report_id, map_images=None):
 
     # "Prepared by" callout box
     prep_html = (
-        '<font color="#D4A017"><b>Prepared by West Egg Development</b></font><br/>'
+        '<font color="#D4A017"><b>Prepared by Massing Report</b></font><br/>'
         '<font size="8" color="#666666">Automated Zoning Feasibility Analysis Engine</font>'
     )
     prep_p = Paragraph(prep_html, ParagraphStyle(
@@ -1002,11 +1008,127 @@ def _build_calculation_breakdown(story, styles, lot, env):
 # SECTION 7: DEVELOPMENT SCENARIOS  (with 3D massing images)
 # ──────────────────────────────────────────────────────────────────
 
-def _build_development_scenarios(story, styles, scenarios, massing_models=None):
-    """Section 7: Individual scenarios with full program and optional 3D massing images."""
+def _build_highlight_badges(scenario, lot=None, envelope=None):
+    """Build a row of small pill badges for scenario characteristics."""
+    badges = []
+
+    # Primary badge: scenario name
+    badges.append(("primary", scenario.name))
+
+    # Conditional badges
+    if lot and getattr(lot, 'street_width', None) == "wide":
+        badges.append(("technical", "Wide Street"))
+    if scenario.parking and scenario.parking.waiver_eligible:
+        badges.append(("positive", "Parking Waived"))
+    if envelope and getattr(envelope, 'quality_housing', False):
+        badges.append(("technical", "Quality Housing"))
+    if "UAP" in scenario.name:
+        badges.append(("positive", "UAP Bonus"))
+    if "4+1" in scenario.name or "Penthouse" in scenario.name:
+        badges.append(("technical", "Penthouse Rule"))
+    if "MIH" in scenario.name or "Inclusionary" in scenario.name:
+        badges.append(("positive", "MIH Required"))
+    if "Tower" in scenario.name:
+        badges.append(("technical", "Tower-on-Base"))
+
+    if not badges:
+        return None
+
+    # Build pill cells
+    badge_style = ParagraphStyle(
+        '_badge', fontName='Helvetica-Bold', fontSize=6.5,
+        leading=8, alignment=TA_CENTER,
+    )
+    cells = []
+    bg_map = {
+        "primary": (GOLD_LIGHT, DARK),
+        "positive": (BADGE_GREEN, colors.HexColor('#1B5E20')),
+        "technical": (BADGE_BLUE, BLUE_DARK),
+    }
+    for btype, label in badges:
+        bg, fg = bg_map.get(btype, (GOLD_LIGHT, DARK))
+        p = Paragraph(f'<font color="{fg.hexval()}">{label}</font>', badge_style)
+        cells.append(p)
+
+    # Create a single-row table with one cell per badge
+    col_w = CONTENT_W / max(len(cells), 1)
+    t = Table([cells], colWidths=[col_w] * len(cells))
+    style_cmds = [
+        ('TOPPADDING', (0, 0), (-1, -1), 2),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
+        ('LEFTPADDING', (0, 0), (-1, -1), 4),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 4),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+    ]
+    for idx, (btype, _) in enumerate(badges):
+        bg, _ = bg_map.get(btype, (GOLD_LIGHT, DARK))
+        style_cmds.append(('BACKGROUND', (idx, 0), (idx, 0), bg))
+    t.setStyle(TableStyle(style_cmds))
+    return t
+
+
+def _build_scenario_manifest_table(scenario, styles):
+    """Build the analyst manifest table for a single scenario (inline)."""
+    s = scenario
+    gross_sf = s.total_gross_sf
+    net_sf = s.total_net_sf
+    zfa = s.zoning_floor_area or gross_sf
+    loss_pct = f"{s.loss_factor.loss_factor_pct:.1f}%" if s.loss_factor else "\u2014"
+    eff_ratio = f"{s.loss_factor.efficiency_ratio:.1f}%" if s.loss_factor else "\u2014"
+    avg_unit_sf = f"{s.unit_mix.average_unit_sf:,.0f}" if s.unit_mix else "\u2014"
+    parking_spaces = str(s.parking.total_spaces_required) if s.parking else "\u2014"
+    waiver = "Yes" if (s.parking and s.parking.waiver_eligible) else "No"
+
+    rows = [
+        ["Metric", "Value"],
+        ["Total Units", str(s.total_units) if s.total_units else "\u2014"],
+        ["Zoning Floor Area (ZFA)", f"{zfa:,.0f} SF"],
+        ["Gross Building Area", f"{gross_sf:,.0f} SF"],
+        ["Net Rentable Area", f"{net_sf:,.0f} SF"],
+        ["Loss Factor", loss_pct],
+        ["Efficiency Ratio", eff_ratio],
+        ["Avg Unit Rentable SF", avg_unit_sf],
+        ["Residential SF", f"{s.residential_sf:,.0f} SF" if s.residential_sf else "\u2014"],
+        ["Commercial SF", f"{s.commercial_sf:,.0f} SF" if s.commercial_sf else "\u2014"],
+        ["Community Facility SF", f"{s.cf_sf:,.0f} SF" if s.cf_sf else "\u2014"],
+        ["Parking Spaces", parking_spaces],
+        ["Waiver Eligible", waiver],
+        ["FAR Used", f"{s.far_used:.2f}"],
+        ["Max Height", f"{s.max_height_ft:.0f} ft"],
+        ["Floors", str(s.num_floors)],
+    ]
+
+    col_widths = [2.8 * inch, CONTENT_W - 2.8 * inch]
+    t = Table(rows, colWidths=col_widths)
+    t.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), BLUE_DARK),
+        ('TEXTCOLOR', (0, 0), (-1, 0), WHITE),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 7.5),
+        ('FONTSIZE', (0, 1), (-1, -1), 8),
+        ('FONTNAME', (0, 1), (0, -1), 'Helvetica-Bold'),
+        ('FONTNAME', (1, 1), (1, -1), 'Helvetica'),
+        ('TEXTCOLOR', (0, 1), (0, -1), GREY),
+        ('TEXTCOLOR', (1, 1), (1, -1), DARK),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
+        ('TOPPADDING', (0, 0), (-1, -1), 2),
+        ('LEFTPADDING', (0, 0), (-1, -1), 6),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 6),
+        ('GRID', (0, 0), (-1, -1), 0.5, GRID_COLOR),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        *[('BACKGROUND', (0, i), (-1, i), FEATURE_BG)
+          for i in range(2, len(rows), 2)],
+    ]))
+    return t
+
+
+def _build_development_scenarios(story, styles, scenarios, lot=None, envelope=None, massing_models=None):
+    """Section 7: Individual scenarios with highlight badges, full program,
+    optional 3D massing, and inline analyst manifest."""
     story.append(PageBreak())
     story.append(_section_header("Development Scenarios", section_num=7, styles=styles))
-    story.append(Spacer(1, 6))
+    story.append(Spacer(1, 4))
 
     # Lazy-import the renderer so we don't crash if matplotlib is missing
     render_fn = None
@@ -1020,24 +1142,30 @@ def _build_development_scenarios(story, styles, scenarios, massing_models=None):
     kv_half = [1.2 * inch, col_half - 1.2 * inch]  # KV table widths within half
 
     for i, scenario in enumerate(scenarios):
-        # ── Scenario header (gold accent bar) ──
+        # ── Scenario header (numbered, gold left-border + top-rule) ──
         sc_head = Paragraph(
-            f"<b>Scenario {i+1}: {scenario.name}</b>",
+            f"<b>Scenario {i+1}</b>",
             ParagraphStyle('ScHead', fontSize=11, fontName='Helvetica-Bold',
                            textColor=DARK, leading=14),
         )
         sc_bar = Table([[sc_head]], colWidths=[CONTENT_W])
         sc_bar.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, -1), GOLD_LIGHT),
             ('TOPPADDING', (0, 0), (-1, -1), 4),
             ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
             ('LEFTPADDING', (0, 0), (-1, -1), 8),
             ('LINEBEFORE', (0, 0), (0, -1), 3, GOLD),
+            ('LINEABOVE', (0, 0), (-1, 0), 1, GOLD),
         ]))
         story.append(sc_bar)
+
+        # ── Highlight badges ──
+        badges = _build_highlight_badges(scenario, lot, envelope)
+        if badges:
+            story.append(badges)
+
         story.append(Spacer(1, 2))
         story.append(Paragraph(scenario.description, styles['SmallBody']))
-        story.append(Spacer(1, 3))
+        story.append(Spacer(1, 2))
 
         # ── BUILD LEFT COLUMN: summary + core + efficiency + parking ──
         left_parts = []
@@ -1226,7 +1354,16 @@ def _build_development_scenarios(story, styles, scenarios, massing_models=None):
                 logger.warning("Failed to render 3D massing for '%s': %s",
                                scenario.name, e)
 
-        story.append(Spacer(1, 12))
+        # ── Inline Analyst's Manifest ──
+        story.append(Spacer(1, 4))
+        story.append(Paragraph("Analyst\u2019s Manifest", styles['SubSectionItalic']))
+        manifest_t = _build_scenario_manifest_table(scenario, styles)
+        story.append(manifest_t)
+
+        # ── Scenario separator ──
+        story.append(Spacer(1, 4))
+        story.append(HRFlowable(width="80%", thickness=0.5, color=GRID_COLOR, hAlign='CENTER'))
+        story.append(Spacer(1, 4))
 
 
 # ──────────────────────────────────────────────────────────────────
@@ -1339,7 +1476,7 @@ def _build_comparison_table(story, styles, scenarios):
 
 def _build_parking_analysis(story, styles, scenarios, parking_layout_result=None):
     """Section 9: Parking analysis with configuration options (no dollar amounts)."""
-    story.append(Spacer(1, 12))
+    story.append(Spacer(1, 8))
     story.append(_section_header("Parking Analysis", section_num=9, styles=styles))
     story.append(Spacer(1, 4))
 
@@ -1664,8 +1801,9 @@ def generate_report(
     # 6. Detailed calculations
     _build_calculation_breakdown(story, styles, lot, env)
 
-    # 7. Development scenarios (with 3D massing)
+    # 7. Development scenarios (with 3D massing, badges, inline manifest)
     _build_development_scenarios(story, styles, result.scenarios,
+                                 lot=lot, envelope=env,
                                  massing_models=massing_models)
 
     # 8. Scenario comparison table
@@ -1721,7 +1859,8 @@ def generate_report_bytes(
     _build_highlighted_features(story, styles, lot, env, scenarios=result.scenarios)
     _build_zoning_overview(story, styles, lot, env, map_images=map_images)
     _build_calculation_breakdown(story, styles, lot, env)
-    _build_development_scenarios(story, styles, result.scenarios, massing_models=massing_models)
+    _build_development_scenarios(story, styles, result.scenarios,
+                                 lot=lot, envelope=env, massing_models=massing_models)
     _build_comparison_table(story, styles, result.scenarios)
     _build_parking_analysis(story, styles, result.scenarios, parking_layout_result)
     _build_assemblage_section(story, styles, assemblage_data)

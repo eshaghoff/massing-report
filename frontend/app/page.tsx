@@ -23,6 +23,9 @@ import {
   Shield,
   Search,
   Download,
+  Compass,
+  ClipboardList,
+  AlertCircle,
 } from "lucide-react";
 
 const BRAND_GOLD = "#D4A843";
@@ -127,6 +130,11 @@ const FEATURES = [
     desc: "UAP bonus FAR, transit-oriented development, and recent zoning changes",
   },
   {
+    icon: ClipboardList,
+    title: "Analyst's Manifest",
+    desc: "Per-scenario digest for pro formas: unit count, gross/net SF, loss factor, avg unit size, commercial area, and parking",
+  },
+  {
     icon: FileText,
     title: "Professional PDF Report",
     desc: "Downloadable report with maps, diagrams, tables, and full analysis",
@@ -196,7 +204,7 @@ export default function LandingPage() {
   return (
     <div className="min-h-screen bg-white">
       {/* Nav */}
-      <nav className="border-b border-gray-100">
+      <nav className="bg-white shadow-sm sticky top-0 z-50">
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div
@@ -226,57 +234,70 @@ export default function LandingPage() {
       </nav>
 
       {/* Hero */}
-      <section className="max-w-4xl mx-auto px-6 pt-20 pb-12 text-center">
-        <h1 className="text-5xl font-bold text-gray-900 leading-tight">
-          In-Depth Zoning Analysis
-          <br />& Due Diligence
-          <br />
-          <span style={{ color: BRAND_GOLD }}>
-            In Seconds. At a Fraction of the Cost.
-          </span>
-        </h1>
-        <p className="mt-6 text-xl text-gray-600 max-w-2xl mx-auto">
-          Instant zoning analysis and massing report for any property in NYC.
-          Get development scenarios, 3D massing models, and a professional PDF
-          report in seconds.
-        </p>
+      <section
+        className="px-6 pt-20 pb-16 text-center"
+        style={{ background: "linear-gradient(135deg, #2C5F7C, #1E4A5F)" }}
+      >
+        <div className="max-w-4xl mx-auto">
+          <h1 className="text-5xl font-bold text-white leading-tight font-heading">
+            In-Depth Zoning Analysis
+            <br />& Due Diligence
+            <br />
+            <span style={{ color: BRAND_GOLD }}>
+              In Seconds. At a Fraction of the Cost.
+            </span>
+          </h1>
+          <p className="mt-6 text-xl text-white/80 max-w-2xl mx-auto">
+            Instant zoning analysis and massing report for any property in New York City.
+            Get development scenarios, 3D massing models, and a professional PDF
+            report in seconds.
+          </p>
 
-        {/* Inline Address Search */}
-        <form onSubmit={handleAnalyze} className="mt-10 max-w-2xl mx-auto">
-          <div className="flex gap-2">
-            <div className="flex-1 relative">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-              <input
-                type="text"
-                value={address}
-                onChange={(e) => setAddress(e.target.value)}
-                placeholder="Enter any NYC address or BBL..."
-                className="w-full pl-12 pr-4 py-4 border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#D4A843] focus:border-transparent text-lg"
-              />
+          {/* Inline Address Search */}
+          <form onSubmit={handleAnalyze} className="mt-10 max-w-2xl mx-auto">
+            <div className="flex gap-2">
+              <div className="flex-1 relative">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                <input
+                  type="text"
+                  value={address}
+                  onChange={(e) => setAddress(e.target.value)}
+                  placeholder="Enter any New York City address or BBL..."
+                  className="w-full pl-12 pr-4 py-4 border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#D4A843] focus:border-transparent text-lg"
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={loading || !address.trim()}
+                className="px-8 py-4 rounded-lg text-white font-semibold text-lg shadow-lg hover:shadow-xl transition whitespace-nowrap disabled:opacity-50"
+                style={{ backgroundColor: BRAND_GOLD }}
+              >
+                {loading ? "Analyzing..." : "Select Property"}
+              </button>
             </div>
-            <button
-              type="submit"
-              disabled={loading || !address.trim()}
-              className="px-8 py-4 rounded-lg text-white font-semibold text-lg shadow-lg hover:shadow-xl transition whitespace-nowrap disabled:opacity-50"
-              style={{ backgroundColor: BRAND_GOLD }}
-            >
-              {loading ? "Analyzing..." : "Select Property"}
-            </button>
-          </div>
-          {error && (
-            <p className="mt-3 text-red-600 text-sm">{error}</p>
-          )}
-        </form>
+            {error && (
+              <div className="mt-3 bg-red-50 border border-red-200 rounded-lg p-3 flex items-start gap-2 text-left">
+                <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-red-700 text-sm font-medium">{error}</p>
+                  <p className="text-red-500 text-xs mt-1">
+                    Accepted formats: street address (e.g. &quot;120 Broadway&quot;) or 10-digit BBL (e.g. &quot;1000477501&quot;)
+                  </p>
+                </div>
+              </div>
+            )}
+          </form>
 
-        {/* Loading State */}
-        {loading && (
-          <div className="mt-8 py-12">
-            <div className="animate-spin w-8 h-8 border-4 border-gray-200 border-t-[#D4A843] rounded-full mx-auto mb-4" />
-            <p className="text-gray-500">
-              Running zoning analysis... This takes a few seconds.
-            </p>
-          </div>
-        )}
+          {/* Loading State */}
+          {loading && (
+            <div className="mt-8 py-12">
+              <div className="animate-spin w-8 h-8 border-4 border-white/30 border-t-[#D4A843] rounded-full mx-auto mb-4" />
+              <p className="text-white/70">
+                Running zoning analysis... This takes a few seconds.
+              </p>
+            </div>
+          )}
+        </div>
       </section>
 
       {/* Analysis Results (shown after search) */}
@@ -422,11 +443,13 @@ export default function LandingPage() {
 
       {/* Value Props Banner */}
       {!preview && (
-        <section className="border-y border-gray-100 bg-gray-50/50">
-          <div className="max-w-5xl mx-auto px-6 py-8">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-center">
+        <section className="bg-white border-b-2" style={{ borderColor: `${BRAND_GOLD}30` }}>
+          <div className="max-w-5xl mx-auto px-6 py-10">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-center">
               <div className="flex flex-col items-center gap-2">
-                <Clock className="w-6 h-6" style={{ color: BRAND_GOLD }} />
+                <div className="w-12 h-12 rounded-full flex items-center justify-center" style={{ backgroundColor: `${BRAND_GOLD}15` }}>
+                  <Clock className="w-6 h-6" style={{ color: BRAND_GOLD }} />
+                </div>
                 <span className="font-semibold text-gray-900">
                   Reports in Under 5 Minutes
                 </span>
@@ -435,7 +458,9 @@ export default function LandingPage() {
                 </span>
               </div>
               <div className="flex flex-col items-center gap-2">
-                <DollarSign className="w-6 h-6" style={{ color: BRAND_GOLD }} />
+                <div className="w-12 h-12 rounded-full flex items-center justify-center" style={{ backgroundColor: `${BRAND_GOLD}15` }}>
+                  <DollarSign className="w-6 h-6" style={{ color: BRAND_GOLD }} />
+                </div>
                 <span className="font-semibold text-gray-900">
                   Fraction of Traditional Cost
                 </span>
@@ -444,9 +469,11 @@ export default function LandingPage() {
                 </span>
               </div>
               <div className="flex flex-col items-center gap-2">
-                <Building2 className="w-6 h-6" style={{ color: BRAND_GOLD }} />
+                <div className="w-12 h-12 rounded-full flex items-center justify-center" style={{ backgroundColor: `${BRAND_GOLD}15` }}>
+                  <Building2 className="w-6 h-6" style={{ color: BRAND_GOLD }} />
+                </div>
                 <span className="font-semibold text-gray-900">
-                  Every NYC Property Covered
+                  Every New York City Property Covered
                 </span>
                 <span className="text-sm text-gray-500">
                   All five boroughs, every zoning district
@@ -458,16 +485,16 @@ export default function LandingPage() {
       )}
 
       {/* How It Works */}
-      <section className="py-20">
+      <section className="py-20 bg-white">
         <div className="max-w-5xl mx-auto px-6">
-          <h2 className="text-3xl font-bold text-center text-gray-900 mb-4">
+          <h2 className="text-3xl font-bold text-center text-gray-900 mb-4 font-heading">
             How It Works
           </h2>
           <p className="text-center text-gray-500 mb-12">
-            Two steps. No learning curve. No waiting around.
+            Just two steps.
           </p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-10 max-w-4xl mx-auto">
-            <div className="bg-white rounded-xl p-10 shadow-sm border border-gray-100 text-center">
+            <div className="bg-white rounded-xl p-10 shadow-sm border border-gray-100 text-center" style={{ borderTop: `3px solid ${BRAND_GOLD}` }}>
               <div
                 className="w-14 h-14 rounded-full flex items-center justify-center text-white text-2xl font-bold mx-auto mb-5"
                 style={{ backgroundColor: BRAND_GOLD }}
@@ -478,11 +505,11 @@ export default function LandingPage() {
                 Select Property
               </h3>
               <p className="text-gray-600 leading-relaxed">
-                Enter any NYC address or BBL number. Select one or multiple
+                Enter any New York City address or BBL number. Select one or multiple
                 properties to analyze together.
               </p>
             </div>
-            <div className="bg-white rounded-xl p-10 shadow-sm border border-gray-100 text-center">
+            <div className="bg-white rounded-xl p-10 shadow-sm border border-gray-100 text-center" style={{ borderTop: `3px solid ${BRAND_GOLD}` }}>
               <div
                 className="w-14 h-14 rounded-full flex items-center justify-center text-white text-2xl font-bold mx-auto mb-5"
                 style={{ backgroundColor: BRAND_GOLD }}
@@ -504,9 +531,9 @@ export default function LandingPage() {
       </section>
 
       {/* What You Get */}
-      <section className="bg-gray-50 py-20">
+      <section className="py-20" style={{ backgroundColor: "#F8F6F1" }}>
         <div className="max-w-6xl mx-auto px-6">
-          <h2 className="text-3xl font-bold text-center text-gray-900 mb-4">
+          <h2 className="text-3xl font-bold text-center text-gray-900 mb-4 font-heading">
             What You Get
           </h2>
           <p className="text-center text-gray-500 mb-12">
@@ -518,13 +545,13 @@ export default function LandingPage() {
               return (
                 <div
                   key={f.title}
-                  className="bg-white border border-gray-200 rounded-lg p-5 hover:shadow-md transition group"
+                  className="bg-white border border-gray-200 rounded-xl p-5 hover:shadow-lg hover:-translate-y-1 transition-all duration-200 group"
                 >
                   <div
-                    className="w-10 h-10 rounded-lg flex items-center justify-center mb-3 group-hover:scale-110 transition-transform"
+                    className="w-12 h-12 rounded-xl flex items-center justify-center mb-3 group-hover:scale-110 transition-transform"
                     style={{ backgroundColor: `${BRAND_NAVY}10` }}
                   >
-                    <Icon className="w-5 h-5" style={{ color: BRAND_NAVY }} />
+                    <Icon className="w-6 h-6" style={{ color: BRAND_NAVY }} />
                   </div>
                   <h3 className="font-semibold text-gray-900 mb-1 text-sm">
                     {f.title}
@@ -538,12 +565,15 @@ export default function LandingPage() {
       </section>
 
       {/* Sample Report */}
-      <section className="py-16 border-b border-gray-100">
+      <section
+        className="py-16"
+        style={{ background: "linear-gradient(135deg, #2C5F7C, #1E4A5F)" }}
+      >
         <div className="max-w-4xl mx-auto px-6 text-center">
-          <h2 className="text-3xl font-bold text-gray-900 mb-4">
+          <h2 className="text-3xl font-bold text-white mb-4 font-heading">
             See a Sample Report
           </h2>
-          <p className="text-gray-600 mb-8 max-w-2xl mx-auto">
+          <p className="text-white/70 mb-8 max-w-2xl mx-auto">
             Download a complete zoning feasibility report to see exactly what
             you get &mdash; zoning maps, 3D massing models, development scenarios,
             floor-by-floor breakdowns, and more.
@@ -552,8 +582,8 @@ export default function LandingPage() {
             href="/sample-report.pdf"
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 px-8 py-4 rounded-lg text-white font-semibold text-lg shadow-lg hover:shadow-xl transition"
-            style={{ backgroundColor: BRAND_NAVY }}
+            className="inline-flex items-center gap-2 px-8 py-4 rounded-lg bg-white font-semibold text-lg shadow-lg hover:shadow-xl transition"
+            style={{ color: BRAND_NAVY }}
           >
             <Download className="w-5 h-5" />
             Download Sample Report
@@ -562,12 +592,12 @@ export default function LandingPage() {
       </section>
 
       {/* Built for... */}
-      <section className="py-20">
-        <div className="max-w-5xl mx-auto px-6">
-          <h2 className="text-3xl font-bold text-center text-gray-900 mb-12">
-            Built for NYC Real Estate Professionals
+      <section className="py-20 bg-white">
+        <div className="max-w-6xl mx-auto px-6">
+          <h2 className="text-3xl font-bold text-center text-gray-900 mb-12 font-heading">
+            Built for New York City Real Estate Professionals
           </h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
             {[
               {
                 icon: Building2,
@@ -583,6 +613,11 @@ export default function LandingPage() {
                 icon: Zap,
                 title: "Investors & Lenders",
                 desc: "Due diligence in minutes, not weeks. Evaluate more deals with less overhead.",
+              },
+              {
+                icon: Compass,
+                title: "Architects & Design Professionals",
+                desc: "Fast-track your design process with instant zoning constraints and massing envelopes for any site.",
               },
             ].map((item) => {
               const Icon = item.icon;
@@ -606,9 +641,9 @@ export default function LandingPage() {
       </section>
 
       {/* Pricing */}
-      <section id="pricing" className="bg-gray-50 py-20">
+      <section id="pricing" className="py-20" style={{ backgroundColor: "#F8F6F1" }}>
         <div className="max-w-4xl mx-auto px-6">
-          <h2 className="text-3xl font-bold text-center text-gray-900 mb-4">
+          <h2 className="text-3xl font-bold text-center text-gray-900 mb-4 font-heading">
             Pricing
           </h2>
           <p className="text-center text-gray-600 mb-12">
@@ -718,8 +753,8 @@ export default function LandingPage() {
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-gray-100 py-8">
-        <div className="max-w-6xl mx-auto px-6 text-center text-sm text-gray-500">
+      <footer className="py-10" style={{ backgroundColor: "#1a2a3a" }}>
+        <div className="max-w-6xl mx-auto px-6 text-center text-sm text-gray-400">
           &copy; {new Date().getFullYear()} Massing Report by West Egg
           Development. All rights reserved.
         </div>
