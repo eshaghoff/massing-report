@@ -1,7 +1,13 @@
 from __future__ import annotations
 
 import json
+import logging
+from collections import Counter
+from statistics import median, mode
+
 import httpx
+
+logger = logging.getLogger(__name__)
 
 
 # MapPLUTO table versions to try (newest first)
@@ -169,3 +175,133 @@ async def fetch_zoning_layers(bbl: str) -> dict:
             return resp.json()
     except Exception:
         return {}
+
+
+
+# ──────────────────────────────────────────────────────────────────
+# BLOCK CHARACTER DESCRIPTION
+# ──────────────────────────────────────────────────────────────────
+
+# Land use code -> human-readable description
+_LAND_USE_DESCRIPTIONS = {
+    "01": "one- and two-family residential",
+    "02": "multi-family walk-up residential",
+    "03": "multi-family elevator residential",
+    "04": "mixed residential and commercial",
+    "05": "commercial and office",
+    "06": "industrial and manufacturing",
+    "07": "transportation and utility",
+    "08": "public facilities and institutions",
+    "09": "open space and outdoor recreation",
+    "10": "parking facilities",
+    "11": "vacant land",
+}
+
+
+async def fetch_block_description(bbl: str) -> str | None:
+    """Generate a natural-language description of the block character.
+
+    Queries PLUTO for all lots on the same block (same borough + block number),
+    aggregates key statistics (building heights, land use, year built, FAR),
+    and returns a 1-2 sentence description like:
+
+        "The block consists mostly of 6-story multifamily walk-up buildings
+        (median year built 1927). Average built FAR is 3.45."
+
+    Returns None if data is unavailable.
+    """
+    if not bbl or len(bbl) < 6:
+        return None
+
+    # Extract borough code and block number from BBL
+    boro = bbl[0]
+    block = bbl[1:6].lstrip("0") or "0"
+
+    for table in _TABLE_NAMES:
+        result = await _query_block_data(boro, block, table)
+        if result is not None:
+            return _format_block_description(result)
+    return None
+
+
+async def _query_block_data(boro: str, block: str, table_name: str) -> list[dict] | None:
+    """Query PLUTO for all lots on a given block."""
+    query = (
+        f"SELECT numfloors, landuse, bldgarea, lotarea, builtfar, yearbuilt "
+        f"FROM {table_name} "
+        f"WHERE borocode = '{boro}' AND block = '{block}' "
+        f"LIMIT 150"
+    )
+    try:
+        async with httpx.AsyncClient(timeout=15) as client:
+            resp = await client.get(_CARTO_URL, params={"q": query})
+            if resp.status_code != 200:
+                return None
+            data = resp.json()
+        rows = data.get("rows", [])
+        if not rows:
+            return None
+        return rows
+    except Exception as e:
+        logger.warning("Block data query failed for block %s: %s", block, e)
+        return None
+
+
+def _format_block_description(rows: list[dict]) -> str:
+    """Format block PLUTO data into natural language description."""
+    # Collect valid values
+    floors_list = [r["numfloors"] for r in rows if r.get("numfloors") and r["numfloors"] > 0]
+    landuse_list = [str(r["landuse"]).zfill(2) for r in rows if r.get("landuse")]
+    year_list = [r["yearbuilt"] for r in rows if r.get("yearbuilt") and r["yearbuilt"] > 1800]
+    far_list = [r["builtfar"] for r in rows if r.get("builtfar") and r["builtfar"] > 0]
+
+    if not floors_list and not landuse_list:
+        return None
+
+    parts = []
+
+    # Dominant land use
+    dominant_use = ""
+    if landuse_list:
+        use_counts = Counter(landuse_list)
+        most_common_code = use_counts.most_common(1)[0][0]
+        dominant_use = _LAND_USE_DESCRIPTIONS.get(most_common_code, "")
+
+    # Median floors
+    median_floors = 0
+    if floors_list:
+        median_floors = round(median(floors_list))
+
+    # Build first sentence
+    if median_floors > 0 and dominant_use:
+        parts.append(
+            f"The block consists mostly of {median_floors}-story "
+            f"{dominant_use} buildings"
+        )
+    elif median_floors > 0:
+        parts.append(f"The block consists mostly of {median_floors}-story buildings")
+    elif dominant_use:
+        parts.append(f"The block consists mostly of {dominant_use} buildings")
+
+    # Median year built
+    if year_list:
+        median_year = round(median(year_list))
+        if parts:
+            parts[-1] += f" (median year built {median_year})"
+        else:
+            parts.append(f"Median year built on the block is {median_year}")
+
+    # Add period to first sentence
+    if parts:
+        parts[-1] += "."
+
+    # Average built FAR
+    if far_list:
+        avg_far = sum(far_list) / len(far_list)
+        parts.append(f"Average built FAR is {avg_far:.2f}.")
+
+    # Total lots context
+    if len(rows) > 3:
+        parts.append(f"The block contains {len(rows)} tax lots.")
+
+    return " ".join(parts) if parts else None

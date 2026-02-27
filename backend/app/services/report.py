@@ -429,12 +429,15 @@ def _build_cover_page(story, styles, lot, env, report_id, map_images=None):
             lot_geom = getattr(lot, 'geometry', None)
             sat_bytes = _enhance_satellite_image(
                 map_images["satellite_bytes"], lot_geometry=lot_geom)
-            img = _image_from_bytes(sat_bytes, CONTENT_W, 3.0 * inch)
+            img = _image_from_bytes(sat_bytes, 4.5 * inch, 4.5 * inch)
+            # Center the square image
+            img.hAlign = 'CENTER'
             story.append(img)
             story.append(Spacer(1, 14))
         except Exception:
             if map_images.get("satellite_bytes"):
-                img = _image_from_bytes(map_images["satellite_bytes"], CONTENT_W, 3.0 * inch)
+                img = _image_from_bytes(map_images["satellite_bytes"], 4.5 * inch, 4.5 * inch)
+                img.hAlign = 'CENTER'
                 story.append(img)
                 story.append(Spacer(1, 14))
 
@@ -532,115 +535,150 @@ def _build_cover_page(story, styles, lot, env, report_id, map_images=None):
 # ──────────────────────────────────────────────────────────────────
 
 def _build_property_maps(story, styles, lot, map_images):
-    """Section 2: NYC overview map + close-up street map (no satellite — it's on cover)."""
+    """Section 2: Property Location — neighbourhood context, maps, block character.
+
+    Layout:
+      - Section header
+      - Neighbourhood name (subtitle)
+      - Cross streets, lot type, street width line
+      - 2x2 map grid: city overview + neighbourhood (top), close-up + street view (bottom)
+      - Block character description paragraph
+    """
     has_street = map_images and map_images.get("street_bytes")
     has_city = map_images and map_images.get("city_overview_bytes")
     has_context = map_images and map_images.get("context_map_bytes")
+    has_neighbourhood = map_images and map_images.get("neighbourhood_map_bytes")
+    has_street_view = map_images and map_images.get("street_view_bytes")
     has_geometry = lot.geometry is not None
+    block_desc = getattr(lot, 'block_description', None) or ""
 
-    if not has_street and not has_city and not has_context and not has_geometry:
+    if (not has_street and not has_city and not has_context
+            and not has_neighbourhood and not has_geometry):
         return
 
     story.append(_section_header("Property Location", section_num=2, styles=styles))
     story.append(Spacer(1, 8))
 
-    # Try side-by-side layout: NYC overview (left) + close-up street (right)
-    left_img = None
-    right_img = None
+    # ── Neighbourhood name (subtitle) ──
+    neighbourhood = getattr(lot, 'neighbourhood', None) or ""
+    if neighbourhood:
+        story.append(Paragraph(
+            neighbourhood,
+            ParagraphStyle('NeighbourhoodTitle', fontSize=16, fontName='Helvetica-Bold',
+                           textColor=BLUE, leading=20, spaceAfter=4),
+        ))
 
-    # Left: NYC overview or context map
-    if has_city:
-        try:
-            left_img = _image_from_bytes(map_images["city_overview_bytes"], 3.3 * inch, 2.8 * inch)
-        except Exception:
-            pass
-    if not left_img and has_context:
-        try:
-            left_img = _image_from_bytes(map_images["context_map_bytes"], 3.3 * inch, 2.8 * inch)
-        except Exception:
-            pass
+    # ── Cross streets + lot details (moved from cover page) ──
+    cross_streets = getattr(lot, 'cross_streets', None) or ""
+    detail_items = []
+    if cross_streets:
+        detail_items.append(f"Cross Streets: {cross_streets}")
+    detail_items.append(f"Lot Type: {lot.lot_type.capitalize()}")
+    if lot.street_width:
+        detail_items.append(f"Street Width: {lot.street_width.capitalize()}")
 
-    # Right: close-up street map
-    if has_street:
-        try:
-            right_img = _image_from_bytes(map_images["street_bytes"], 3.3 * inch, 2.8 * inch)
-        except Exception:
-            pass
+    if detail_items:
+        detail_text = "  \u2022  ".join(detail_items)
+        story.append(Paragraph(
+            detail_text,
+            ParagraphStyle('LocationDetails', fontSize=9.5, fontName='Helvetica',
+                           textColor=GREY, leading=13, spaceAfter=10),
+        ))
 
-    if left_img and right_img:
-        # Side-by-side layout
-        left_cell = [
-            [Paragraph("NYC Overview", ParagraphStyle(
-                'MapLabel', fontSize=9, fontName='Helvetica-Bold',
-                textColor=BLUE_DARK, alignment=TA_CENTER, spaceAfter=4))],
-            [left_img],
-            [Paragraph(
-                "Red marker indicates subject property. Source: ESRI.",
-                ParagraphStyle('MapNote', fontSize=7, fontName='Helvetica-Oblique',
-                               textColor=GREY, alignment=TA_CENTER, spaceBefore=2))],
-        ]
-        right_cell = [
-            [Paragraph("Property Close-Up", ParagraphStyle(
-                'MapLabel2', fontSize=9, fontName='Helvetica-Bold',
-                textColor=BLUE_DARK, alignment=TA_CENTER, spaceAfter=4))],
-            [right_img],
-            [Paragraph(
-                "Lot boundary outlined in blue. Source: ESRI / OpenStreetMap.",
-                ParagraphStyle('MapNote2', fontSize=7, fontName='Helvetica-Oblique',
-                               textColor=GREY, alignment=TA_CENTER, spaceBefore=2))],
-        ]
-        left_t = Table(left_cell, colWidths=[3.3 * inch])
-        right_t = Table(right_cell, colWidths=[3.3 * inch])
-        for t in (left_t, right_t):
-            t.setStyle(TableStyle([
+    # ── 2x2 Map Grid ──
+    map_w = 3.3 * inch
+    map_h = 2.6 * inch
+    map_note_style = ParagraphStyle(
+        'MapNote', fontSize=7, fontName='Helvetica-Oblique',
+        textColor=GREY, alignment=TA_CENTER, spaceBefore=2, spaceAfter=0)
+    map_label_style = ParagraphStyle(
+        'MapLabel', fontSize=9, fontName='Helvetica-Bold',
+        textColor=BLUE_DARK, alignment=TA_CENTER, spaceAfter=3)
+
+    def _map_cell(label, image_bytes, note, fallback_bytes=None):
+        """Build a table cell with label + image + note."""
+        img_bytes = image_bytes or fallback_bytes
+        if not img_bytes:
+            return None
+        try:
+            img = _image_from_bytes(img_bytes, map_w, map_h)
+            cell_table = Table([
+                [Paragraph(label, map_label_style)],
+                [img],
+                [Paragraph(note, map_note_style)],
+            ], colWidths=[map_w])
+            cell_table.setStyle(TableStyle([
                 ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
                 ('VALIGN', (0, 0), (-1, -1), 'TOP'),
                 ('TOPPADDING', (0, 0), (-1, -1), 0),
-                ('BOTTOMPADDING', (0, 0), (-1, -1), 0),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
             ]))
+            return cell_table
+        except Exception:
+            return None
 
-        pair = Table([[left_t, right_t]], colWidths=[CONTENT_W / 2, CONTENT_W / 2])
-        pair.setStyle(TableStyle([
+    # Top row: City overview (left) + Neighbourhood map (right)
+    top_left = _map_cell(
+        "NYC Overview",
+        map_images.get("city_overview_bytes") if map_images else None,
+        "Red marker indicates subject property. Source: ESRI.",
+    )
+    top_right = _map_cell(
+        "Neighbourhood",
+        map_images.get("neighbourhood_map_bytes") if map_images else None,
+        "Neighbourhood context (~0.75 mi radius). Source: ESRI.",
+        fallback_bytes=map_images.get("context_map_bytes") if map_images else None,
+    )
+
+    # Bottom row: Close-up street (left) + Street view (right)
+    bottom_left = _map_cell(
+        "Property Close-Up",
+        map_images.get("street_bytes") if map_images else None,
+        "Lot boundary outlined in blue. Source: ESRI.",
+    )
+    bottom_right = _map_cell(
+        "Street View",
+        map_images.get("street_view_bytes") if map_images else None,
+        "Street-level imagery. Source: Mapillary.",
+    )
+
+    # Build the grid — handle missing images gracefully
+    half_w = CONTENT_W / 2
+
+    # Top row
+    if top_left and top_right:
+        row_t = Table([[top_left, top_right]], colWidths=[half_w, half_w])
+        row_t.setStyle(TableStyle([
             ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
             ('VALIGN', (0, 0), (-1, -1), 'TOP'),
         ]))
-        story.append(pair)
-        story.append(Spacer(1, 10))
-    else:
-        # Fallback: stack whatever we have
-        if left_img:
-            story.append(Paragraph("NYC Overview", styles['SubSection']))
-            story.append(left_img)
-            story.append(Paragraph(
-                "Red marker indicates subject property. Source: ESRI.",
-                styles['NoteText'],
-            ))
-            story.append(Spacer(1, 8))
-        if right_img:
-            story.append(Paragraph("Street Map with Lot Boundary", styles['SubSection']))
-            story.append(right_img)
-            story.append(Paragraph(
-                "Lot boundary outlined in blue. Source: ESRI / OpenStreetMap.",
-                styles['NoteText'],
-            ))
-            story.append(Spacer(1, 8))
+        story.append(row_t)
+        story.append(Spacer(1, 6))
+    elif top_left:
+        story.append(top_left)
+        story.append(Spacer(1, 6))
+    elif top_right:
+        story.append(top_right)
+        story.append(Spacer(1, 6))
 
-    # If we still have the context map and it wasn't used above, show it
-    if has_context and not has_city and left_img is None:
-        try:
-            story.append(Paragraph("Neighbourhood Context", styles['SubSection']))
-            ctx_img = _image_from_bytes(map_images["context_map_bytes"], CONTENT_W, 3.0 * inch)
-            story.append(ctx_img)
-            story.append(Paragraph(
-                "Zoomed-out view showing property location. Source: ESRI.",
-                styles['NoteText'],
-            ))
-            story.append(Spacer(1, 8))
-        except Exception:
-            pass
+    # Bottom row
+    if bottom_left and bottom_right:
+        row_b = Table([[bottom_left, bottom_right]], colWidths=[half_w, half_w])
+        row_b.setStyle(TableStyle([
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ]))
+        story.append(row_b)
+        story.append(Spacer(1, 6))
+    elif bottom_left:
+        story.append(bottom_left)
+        story.append(Spacer(1, 6))
+    elif bottom_right:
+        story.append(bottom_right)
+        story.append(Spacer(1, 6))
 
-    # Fallback: programmatic lot diagram
-    if not has_street and not has_city and not has_context and has_geometry:
+    # If no maps at all, show fallback diagram
+    if not any([top_left, top_right, bottom_left, bottom_right]) and has_geometry:
         story.append(Paragraph("Lot Boundary Diagram", styles['SubSection']))
         try:
             from app.services.maps import draw_lot_diagram_reportlab
@@ -660,10 +698,19 @@ def _build_property_maps(story, styles, lot, map_images):
                 styles['NoteText'],
             ))
         except Exception:
-            story.append(Paragraph(
-                "Map images not available. Lot geometry on file.",
-                styles['Body'],
-            ))
+            pass
+
+    # ── Block Character Description ──
+    if block_desc:
+        story.append(Spacer(1, 10))
+        story.append(Paragraph("Block Character", ParagraphStyle(
+            'BlockCharTitle', fontSize=12, fontName='Helvetica-Bold',
+            textColor=DARK, spaceAfter=4, spaceBefore=6)))
+        story.append(Paragraph(
+            block_desc,
+            ParagraphStyle('BlockCharBody', fontSize=10, fontName='Helvetica',
+                           textColor=DARK, leading=14, spaceAfter=6),
+        ))
 
     story.append(PageBreak())
 

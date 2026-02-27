@@ -74,6 +74,10 @@ ESRI_STREET_URL = (
     "https://server.arcgisonline.com/arcgis/rest/services/"
     "World_Street_Map/MapServer/export"
 )
+ESRI_LIGHT_GRAY_URL = (
+    "https://server.arcgisonline.com/arcgis/rest/services/"
+    "Canvas/World_Light_Gray_Base/MapServer/export"
+)
 
 
 async def _fetch_esri_image(
@@ -475,10 +479,11 @@ NYC_ZONING_FEATURE_URL = (
 
 # Color coding for zoning district types
 ZONING_DISTRICT_COLORS = {
-    "R": (255, 255, 180, 80),   # Residential: light yellow
-    "C": (255, 190, 190, 80),   # Commercial: light red
-    "M": (210, 190, 255, 80),   # Manufacturing: light purple
-    "P": (190, 230, 190, 80),   # Park: light green
+    "R": (255, 235, 130, 130),   # Residential: warm yellow
+    "C": (240, 140, 140, 130),   # Commercial: red
+    "M": (190, 160, 230, 130),   # Manufacturing: purple
+    "P": (140, 210, 140, 130),   # Park: green
+    "BPC": (255, 200, 150, 130), # Battery Park City: orange
 }
 
 
@@ -491,10 +496,14 @@ async def fetch_zoning_map_image(
 ) -> bytes | None:
     """Fetch a zoning district map with the subject property marked.
 
-    1. Fetches ESRI street map as base (wider area for context).
-    2. Queries NYC zoning district polygons via ArcGIS FeatureServer.
-    3. Overlays color-coded district boundaries.
-    4. Marks the subject property with bold outline and pin.
+    Visual improvements:
+    - Light gray canvas base map (less visual clutter)
+    - Opaque district fills (alpha=130) so zones are clearly visible
+    - Thick district boundary lines (2px dark gray)
+    - White background boxes behind district labels for legibility
+    - Larger label font (14pt)
+    - Subject property with white halo (7px white behind 4px blue)
+    - Colour legend in bottom-right corner
 
     Returns PNG bytes or None if all sources fail.
     """
@@ -512,10 +521,12 @@ async def fetch_zoning_map_image(
     )
     minx, miny, maxx, maxy = bbox
 
-    # Step 1: Fetch base street map
-    base_img = await _fetch_esri_image(ESRI_STREET_URL, bbox, width, height)
+    # Step 1: Fetch LIGHT GRAY base map (much cleaner than street map)
+    base_img = await _fetch_esri_image(ESRI_LIGHT_GRAY_URL, bbox, width, height)
     if not base_img:
-        # Try with satellite as fallback
+        # Fallback to street map
+        base_img = await _fetch_esri_image(ESRI_STREET_URL, bbox, width, height)
+    if not base_img:
         base_img = await _fetch_esri_image(ESRI_SATELLITE_URL, bbox, width, height)
     if not base_img:
         return None
@@ -529,10 +540,26 @@ async def fetch_zoning_map_image(
         py = (maxy - gy) / (maxy - miny) * h
         return (px, py)
 
+    # Load font
+    try:
+        label_font = ImageFont.truetype("/System/Library/Fonts/Helvetica.ttc", 14)
+    except Exception:
+        try:
+            label_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 14)
+        except Exception:
+            label_font = ImageFont.load_default()
+
+    try:
+        small_font = ImageFont.truetype("/System/Library/Fonts/Helvetica.ttc", 10)
+    except Exception:
+        small_font = ImageFont.load_default()
+
     # Step 2: Query zoning districts within bbox
     districts_geojson = await _fetch_zoning_districts(bbox)
 
-    # Step 3: Overlay zoning districts
+    # Step 3: Overlay zoning districts with improved visuals
+    legend_entries = {}  # zone_prefix -> color for legend
+
     if districts_geojson:
         overlay = Image.new("RGBA", img.size, (0, 0, 0, 0))
         draw = ImageDraw.Draw(overlay)
@@ -544,11 +571,17 @@ async def fetch_zoning_map_image(
             geom_type = geom.get("type", "")
 
             # Determine color by district prefix
-            color = ZONING_DISTRICT_COLORS.get("R", (200, 200, 200, 60))
+            color = (200, 200, 200, 100)  # Default gray
+            zone_prefix = ""
             for prefix, c in ZONING_DISTRICT_COLORS.items():
                 if zone_code.upper().startswith(prefix):
                     color = c
+                    zone_prefix = prefix
                     break
+
+            # Track for legend
+            if zone_prefix and zone_prefix not in legend_entries:
+                legend_entries[zone_prefix] = color
 
             # Extract coordinate rings
             rings = []
@@ -565,34 +598,52 @@ async def fetch_zoning_map_image(
             for ring in rings:
                 pixel_pts = [geo_to_px(float(c[0]), float(c[1])) for c in ring]
                 if len(pixel_pts) >= 3:
-                    # Fill
+                    # Opaque fill
                     draw.polygon(pixel_pts, fill=tuple(color))
-                    # Border
-                    border_color = tuple(min(255, c + 80) if i < 3 else 180
-                                        for i, c in enumerate(color))
+                    # Thick dark gray border (2px)
+                    border_color = (100, 100, 100, 200)
                     for k in range(len(pixel_pts)):
                         p1 = pixel_pts[k]
                         p2 = pixel_pts[(k + 1) % len(pixel_pts)]
-                        draw.line([p1, p2], fill=border_color, width=1)
+                        draw.line([p1, p2], fill=border_color, width=2)
 
-                    # Label district code at centroid
-                    if pixel_pts:
+                    # Label district code at centroid with white background
+                    if pixel_pts and zone_code:
                         cx = sum(p[0] for p in pixel_pts) / len(pixel_pts)
                         cy = sum(p[1] for p in pixel_pts) / len(pixel_pts)
                         # Only label if centroid is within image bounds
-                        if 10 < cx < w - 10 and 10 < cy < h - 10:
+                        if 30 < cx < w - 30 and 30 < cy < h - 30:
                             try:
+                                # Measure text size
+                                text_bbox = draw.textbbox((0, 0), zone_code, font=label_font)
+                                tw = text_bbox[2] - text_bbox[0]
+                                th = text_bbox[3] - text_bbox[1]
+                                # White background box with padding
+                                pad = 3
+                                draw.rectangle(
+                                    [cx - tw/2 - pad, cy - th/2 - pad,
+                                     cx + tw/2 + pad, cy + th/2 + pad],
+                                    fill=(255, 255, 255, 210),
+                                )
                                 draw.text(
                                     (cx, cy), zone_code,
-                                    fill=(80, 80, 80, 220),
+                                    fill=(60, 60, 60, 240),
                                     anchor="mm",
+                                    font=label_font,
                                 )
                             except Exception:
-                                pass
+                                try:
+                                    draw.text(
+                                        (cx - 15, cy - 7), zone_code,
+                                        fill=(60, 60, 60, 240),
+                                        font=label_font,
+                                    )
+                                except Exception:
+                                    pass
 
         img = Image.alpha_composite(img, overlay)
 
-    # Step 4: Mark subject property
+    # Step 4: Mark subject property with white halo
     if geometry:
         overlay2 = Image.new("RGBA", img.size, (0, 0, 0, 0))
         draw2 = ImageDraw.Draw(overlay2)
@@ -611,9 +662,13 @@ async def fetch_zoning_map_image(
         for ring in rings:
             pixel_pts = [geo_to_px(float(c[0]), float(c[1])) for c in ring]
             if len(pixel_pts) >= 3:
-                # Bold blue fill
-                draw2.polygon(pixel_pts, fill=(74, 144, 217, 120))
-                # Thick blue outline
+                # Blue fill
+                draw2.polygon(pixel_pts, fill=(74, 144, 217, 140))
+                # White halo (7px) behind blue outline (4px)
+                for k in range(len(pixel_pts)):
+                    p1 = pixel_pts[k]
+                    p2 = pixel_pts[(k + 1) % len(pixel_pts)]
+                    draw2.line([p1, p2], fill=(255, 255, 255, 220), width=7)
                 for k in range(len(pixel_pts)):
                     p1 = pixel_pts[k]
                     p2 = pixel_pts[(k + 1) % len(pixel_pts)]
@@ -621,11 +676,61 @@ async def fetch_zoning_map_image(
 
         # Red pin at centroid
         pin_x, pin_y = geo_to_px(lng, lat) if lat and lng else (w / 2, h / 2)
-        r = 6
+        r = 7
         draw2.ellipse([pin_x - r, pin_y - r, pin_x + r, pin_y + r],
                       fill=(220, 50, 50, 255), outline=(255, 255, 255, 255), width=2)
 
         img = Image.alpha_composite(img, overlay2)
+
+    # Step 5: Draw legend in bottom-right corner
+    if legend_entries:
+        legend_overlay = Image.new("RGBA", img.size, (0, 0, 0, 0))
+        legend_draw = ImageDraw.Draw(legend_overlay)
+
+        legend_labels = {
+            "R": "Residential",
+            "C": "Commercial",
+            "M": "Manufacturing",
+            "P": "Park",
+            "BPC": "Battery Park City",
+        }
+
+        items = [(prefix, legend_labels.get(prefix, prefix), color)
+                 for prefix, color in legend_entries.items()]
+
+        # Legend dimensions
+        item_h = 18
+        legend_h = len(items) * item_h + 28  # header + items + padding
+        legend_w = 140
+        lx = w - legend_w - 15
+        ly = h - legend_h - 15
+
+        # Background
+        legend_draw.rectangle([lx, ly, lx + legend_w, ly + legend_h],
+                              fill=(255, 255, 255, 220), outline=(180, 180, 180, 200))
+
+        # Title
+        try:
+            legend_draw.text((lx + 8, ly + 4), "Zoning Districts",
+                             fill=(60, 60, 60, 255), font=small_font)
+        except Exception:
+            pass
+
+        # Items
+        for i, (prefix, label_text, color) in enumerate(items):
+            y_pos = ly + 22 + i * item_h
+            # Color swatch
+            swatch_color = (color[0], color[1], color[2], 200)
+            legend_draw.rectangle([lx + 8, y_pos, lx + 22, y_pos + 12],
+                                  fill=swatch_color, outline=(100, 100, 100, 180))
+            # Label
+            try:
+                legend_draw.text((lx + 28, y_pos - 1), label_text,
+                                 fill=(60, 60, 60, 255), font=small_font)
+            except Exception:
+                pass
+
+        img = Image.alpha_composite(img, legend_overlay)
 
     # Convert to RGB for PNG export
     final = img.convert("RGB")
@@ -787,6 +892,179 @@ async def fetch_city_overview_map(
     buf = BytesIO()
     final.save(buf, format="PNG")
     return buf.getvalue()
+
+
+
+
+# ──────────────────────────────────────────────────────────────────
+# BBOX SQUARE HELPER
+# ──────────────────────────────────────────────────────────────────
+
+def _make_bbox_square(bbox: tuple[float, float, float, float]) -> tuple[float, float, float, float]:
+    """Take any bbox and return a square bbox centered on the same point.
+
+    The square side length equals the larger of width/height.
+    """
+    minx, miny, maxx, maxy = bbox
+    cx = (minx + maxx) / 2
+    cy = (miny + maxy) / 2
+    dx = (maxx - minx) / 2
+    dy = (maxy - miny) / 2
+    half = max(dx, dy)
+    return (cx - half, cy - half, cx + half, cy + half)
+
+
+# ──────────────────────────────────────────────────────────────────
+# NEIGHBOURHOOD MAP
+# ──────────────────────────────────────────────────────────────────
+
+async def fetch_neighbourhood_map_image(
+    lat: float,
+    lng: float,
+    geometry: dict | None = None,
+    width: int = 800,
+    height: int = 600,
+) -> bytes | None:
+    """Fetch a neighbourhood-level map (~0.75 mile radius) with subject property marker.
+
+    Uses ESRI Street Map at ~4000ft radius for neighbourhood context — wider than
+    the close-up street map but tighter than the city overview.
+    """
+    try:
+        from PIL import Image, ImageDraw, ImageFont
+    except ImportError:
+        logger.warning("Pillow not installed — cannot create neighbourhood map")
+        return None
+
+    # ~4000ft radius ~ 0.75 mile — good neighbourhood context
+    bbox = compute_bbox_from_latlng(lat, lng, radius_ft=4000)
+    minx, miny, maxx, maxy = bbox
+
+    # Fetch base street map at neighbourhood scale
+    base_img = await _fetch_esri_image(ESRI_STREET_URL, bbox, width, height)
+    if not base_img:
+        return None
+
+    img = Image.open(BytesIO(base_img)).convert("RGBA")
+    w, h = img.size
+
+    def geo_to_px(gx: float, gy: float) -> tuple[float, float]:
+        px = (gx - minx) / (maxx - minx) * w
+        py = (maxy - gy) / (maxy - miny) * h
+        return (px, py)
+
+    overlay = Image.new("RGBA", img.size, (0, 0, 0, 0))
+    draw = ImageDraw.Draw(overlay)
+
+    pin_x, pin_y = geo_to_px(lng, lat)
+
+    # Outer glow ring
+    r_glow = 16
+    draw.ellipse(
+        [pin_x - r_glow, pin_y - r_glow, pin_x + r_glow, pin_y + r_glow],
+        fill=(220, 50, 50, 80),
+    )
+    # Main red circle
+    r_outer = 10
+    draw.ellipse(
+        [pin_x - r_outer, pin_y - r_outer, pin_x + r_outer, pin_y + r_outer],
+        fill=(220, 50, 50, 220), outline=(255, 255, 255, 255), width=3,
+    )
+    # Inner white dot
+    r_inner = 3
+    draw.ellipse(
+        [pin_x - r_inner, pin_y - r_inner, pin_x + r_inner, pin_y + r_inner],
+        fill=(255, 255, 255, 255),
+    )
+
+    # Label with background
+    label = "Subject Property"
+    try:
+        try:
+            font = ImageFont.truetype("/System/Library/Fonts/Helvetica.ttc", 12)
+        except Exception:
+            font = ImageFont.load_default()
+        label_x = pin_x + 16
+        label_y = pin_y - 8
+        draw.rectangle(
+            [label_x - 3, label_y - 2, label_x + 120, label_y + 15],
+            fill=(255, 255, 255, 210),
+        )
+        draw.text((label_x, label_y), label, fill=(220, 50, 50, 255), font=font)
+    except Exception:
+        pass
+
+    img = Image.alpha_composite(img, overlay)
+    final = img.convert("RGB")
+    buf = BytesIO()
+    final.save(buf, format="PNG")
+    return buf.getvalue()
+
+
+# ──────────────────────────────────────────────────────────────────
+# STREET VIEW (MAPILLARY)
+# ──────────────────────────────────────────────────────────────────
+
+async def fetch_street_view_image(
+    lat: float,
+    lng: float,
+) -> bytes | None:
+    """Fetch a street-level image from Mapillary (free, no Google API needed).
+
+    Queries Mapillary API v4 for the closest image to the given coordinates,
+    picks the most recent one, and fetches the 2048px thumbnail.
+
+    Returns image bytes or None if no coverage / no token / error.
+    """
+    token = settings.mapillary_access_token
+    if not token:
+        logger.info("No Mapillary access token configured — skipping street view")
+        return None
+
+    # Search for images within ~100ft of the coordinates
+    delta = 0.0003  # ~100ft in degrees
+    bbox_str = f"{lng - delta},{lat - delta},{lng + delta},{lat + delta}"
+
+    search_url = "https://graph.mapillary.com/images"
+    params = {
+        "access_token": token,
+        "fields": "id,thumb_2048_url,captured_at",
+        "bbox": bbox_str,
+        "limit": "5",
+    }
+
+    try:
+        async with httpx.AsyncClient(timeout=15) as client:
+            resp = await client.get(search_url, params=params)
+            if resp.status_code != 200:
+                logger.warning("Mapillary search returned status %s", resp.status_code)
+                return None
+            data = resp.json()
+
+        images = data.get("data", [])
+        if not images:
+            logger.info("No Mapillary coverage near %.6f, %.6f", lat, lng)
+            return None
+
+        # Pick the most recent image
+        images.sort(key=lambda x: x.get("captured_at", 0), reverse=True)
+        best = images[0]
+        thumb_url = best.get("thumb_2048_url")
+        if not thumb_url:
+            logger.warning("Mapillary image %s has no thumb_2048_url", best.get("id"))
+            return None
+
+        # Fetch the image bytes
+        async with httpx.AsyncClient(timeout=15) as client:
+            img_resp = await client.get(thumb_url)
+            if img_resp.status_code == 200 and img_resp.headers.get("content-type", "").startswith("image"):
+                return img_resp.content
+            logger.warning("Mapillary thumbnail fetch returned status %s", img_resp.status_code)
+            return None
+
+    except Exception as exc:
+        logger.warning("Mapillary street view fetch failed: %s", exc)
+        return None
 
 
 async def _fetch_zoning_districts(

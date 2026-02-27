@@ -83,6 +83,7 @@ class LotProfile(BaseModel):
     coastal_zone: bool = False
     neighbourhood: Optional[str] = None
     cross_streets: Optional[str] = None
+    block_description: Optional[str] = None
 
 
 class SkyExposurePlane(BaseModel):

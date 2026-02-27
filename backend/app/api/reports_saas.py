@@ -17,13 +17,14 @@ from app.config import settings
 # ── Zoning engine imports ──
 from app.services.geocoding import geocode_address, parse_address
 from app.services.pluto import fetch_pluto_data
-from app.services.geometry import fetch_lot_geometry, fetch_zoning_layers
+from app.services.geometry import fetch_lot_geometry, fetch_zoning_layers, fetch_block_description
 from app.services.report import generate_report
 from app.services.street_width import determine_street_width
 from app.services.maps import (
     fetch_satellite_image, fetch_street_map_image,
     fetch_zoning_map_image, fetch_context_map_image,
-    fetch_city_overview_map,
+    fetch_city_overview_map, fetch_neighbourhood_map_image,
+    fetch_street_view_image,
 )
 from app.services.geocoding import fetch_neighbourhood, fetch_cross_streets
 from app.zoning_engine.calculator import ZoningCalculator
@@ -334,21 +335,29 @@ async def _generate_report_task(report_id: str, req: GenerateRequest, user: User
         lng = lot_profile.longitude
         lot_geom = lot_profile.geometry
         if lat and lng:
-            sat, street, zmap, ctx, city = await asyncio.gather(
-                fetch_satellite_image(lat, lng, lot_geom),
+            sat, street, zmap, ctx, city, nbhd, sv, block_desc = await asyncio.gather(
+                fetch_satellite_image(lat, lng, lot_geom, width=800, height=800),
                 fetch_street_map_image(lat, lng, lot_geom),
                 fetch_zoning_map_image(lat, lng, lot_geom),
                 fetch_context_map_image(lat, lng, lot_geom),
                 fetch_city_overview_map(lat, lng),
+                fetch_neighbourhood_map_image(lat, lng, lot_geom),
+                fetch_street_view_image(lat, lng),
+                fetch_block_description(lot_profile.bbl),
             )
-            if any([sat, street, zmap, ctx, city]):
+            if any([sat, street, zmap, ctx, city, nbhd, sv]):
                 map_images = {
                     "satellite_bytes": sat,
                     "street_bytes": street,
                     "zoning_map_bytes": zmap,
                     "context_map_bytes": ctx,
                     "city_overview_bytes": city,
+                    "neighbourhood_map_bytes": nbhd,
+                    "street_view_bytes": sv,
                 }
+            # Set block description on lot profile
+            if block_desc:
+                lot_profile.block_description = block_desc
 
         # Massing models
         massing_models = {}
