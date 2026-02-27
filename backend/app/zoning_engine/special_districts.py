@@ -144,6 +144,120 @@ SPECIAL_DISTRICTS = {
         "name": "Special Governors Island District",
         "description": "Special regulations for Governors Island redevelopment.",
     },
+    # ─── FLUSHING WATERFRONT (ZR 129-00) ───
+    "FW": {
+        "name": "Special Flushing Waterfront District",
+        "description": "Mixed-use waterfront area in Flushing with mandatory "
+                       "affordable housing and height tiers.",
+        "far_override": {
+            "residential_base": 3.0,
+            "residential_max_with_bonus": 6.0,
+            "commercial": 2.0,
+            "cf": 4.8,
+        },
+        "mandatory_inclusionary": True,
+    },
+
+    # ─── WILLETS POINT (ZR 124-00) ───
+    "WP": {
+        "name": "Special Willets Point District",
+        "description": "Large-scale redevelopment area near Citi Field with "
+                       "phased FAR and mandatory affordable housing.",
+        "far_override": {
+            "residential_base": 3.0,
+            "residential_max_with_bonus": 6.9,
+            "commercial_base": 2.0,
+            "commercial_max_with_bonus": 5.0,
+        },
+        "mandatory_inclusionary": True,
+    },
+
+    # ─── HARLEM RIVER WATERFRONT (ZR 87-60) ───
+    "HRW": {
+        "name": "Special Harlem River Waterfront District",
+        "description": "Bronx waterfront district requiring waterfront public "
+                       "access and height controls.",
+        "far_override": {
+            "residential": 5.0,
+            "commercial": 3.0,
+            "cf": 5.0,
+        },
+    },
+
+    # ─── BATTERY PARK CITY ───
+    "BPC": {
+        "name": "Battery Park City",
+        "description": "Governed by BPC Authority master plan with unique "
+                       "FAR, height, and use regulations.",
+        "far_override": {
+            "residential": 10.0,
+            "commercial": 15.0,
+            "cf": 10.0,
+        },
+    },
+
+    # ─── LOWER MANHATTAN (ZR 91-00) ───
+    "LM": {
+        "name": "Special Lower Manhattan District",
+        "description": "FAR bonuses and conversion incentives for Lower "
+                       "Manhattan south of Chambers Street.",
+        "far_override": {
+            "commercial_base": 15.0,
+            "commercial_max_with_bonus": 18.0,
+            "residential": 12.0,
+        },
+        "bonuses": {
+            "subway_improvement": {"max_additional_far": 3.0},
+            "public_plaza": {"max_additional_far": 2.0},
+        },
+    },
+
+    # ─── EAST MIDTOWN (ZR 81-60) ───
+    "EM": {
+        "name": "Special East Midtown Subdistrict",
+        "description": "High-density commercial with TDR bank for landmark "
+                       "preservation and public realm improvements.",
+        "far_override": {
+            "commercial_base": 15.0,
+            "commercial_max_with_bonus": 27.0,
+        },
+        "tdr_available": True,
+        "bonuses": {
+            "landmark_tdr": {"max_additional_far": 12.0},
+            "public_realm": {"max_additional_far": 3.0},
+        },
+    },
+
+    # ─── 125TH STREET (ZR 97-00) ───
+    "125": {
+        "name": "Special 125th Street District",
+        "description": "Mixed-use corridor along 125th Street with mandatory "
+                       "inclusionary housing and height tiers.",
+        "far_override": {
+            "residential_base": 6.0,
+            "residential_max_with_bonus": 9.0,
+            "commercial": 6.0,
+        },
+        "mandatory_inclusionary": True,
+    },
+
+    # ─── COASTAL RISK (ZR Appendix A) ───
+    "CR": {
+        "name": "Coastal Flood Resilience Zone",
+        "description": "Areas with flood resilience requirements including "
+                       "freeboard, wet/dry floodproofing, and elevated utilities.",
+    },
+
+    # ─── ENHANCED COMMERCIAL ───
+    "EC2": {
+        "name": "Enhanced Commercial District",
+        "description": "Various mapped areas with enhanced commercial FAR "
+                       "and ground-floor retail requirements.",
+        "far_override": {
+            "commercial": 2.0,
+        },
+    },
+
 }
 
 

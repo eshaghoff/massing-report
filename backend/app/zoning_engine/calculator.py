@@ -54,6 +54,7 @@ from app.zoning_engine.special_districts import (
     get_special_district_bonuses,
 )
 from app.zoning_engine.city_of_yes import calculate_uap_scenario, get_city_of_yes_summary
+from app.zoning_engine.programs import check_all_programs, get_program_effects_summary, ProgramCategory
 
 
 class ZoningCalculator:
@@ -85,6 +86,16 @@ class ZoningCalculator:
             street_width=lot.street_width,
         )
 
+        # ── Run all program checks ──
+        program_results = check_all_programs(lot)
+        program_effects = get_program_effects_summary(program_results)
+
+        # ── Generate bonus scenarios for applicable programs with FAR bonuses ──
+        bonus_scenarios = self._generate_bonus_scenarios(
+            lot, envelope, primary_district, scenarios, program_results,
+        )
+        scenarios.extend(bonus_scenarios)
+
         return {
             "zoning_envelope": envelope,
             "scenarios": scenarios,
@@ -92,6 +103,10 @@ class ZoningCalculator:
             "street_wall": street_wall,
             "special_districts": special_district_info,
             "city_of_yes": coy_summary,
+            "programs": {
+                "results": program_results,
+                "effects_summary": program_effects,
+            },
         }
 
     def calculate_envelope(self, lot: LotProfile, district: str) -> ZoningEnvelope:
@@ -521,6 +536,135 @@ class ZoningCalculator:
             footprint = min(footprint, max_coverage_sf)
 
         return max(footprint, 0)
+
+    # ──────────────────────────────────────────────────────────────
+    # BONUS PROGRAM SCENARIOS
+    # ──────────────────────────────────────────────────────────────
+
+    def _generate_bonus_scenarios(
+        self,
+        lot: LotProfile,
+        envelope: ZoningEnvelope,
+        district: str,
+        base_scenarios: list[DevelopmentScenario],
+        program_results: list,
+    ) -> list[DevelopmentScenario]:
+        """Generate individual + combined bonus scenarios from applicable programs.
+
+        For each applicable program with a FAR bonus, creates a "Max Res + {Program}"
+        scenario.  Also creates one combined "Max Development (All Programs)" scenario
+        stacking all applicable bonuses.
+
+        Skips programs that already have dedicated scenarios (UAP, MIH) and programs
+        that only impose restrictions or are informational (IBZ, LSRD).
+        """
+        # Programs that already generate their own scenarios in generate_scenarios()
+        _SKIP_KEYS = {"mih", "uap", "voluntary_ih"}
+        # Programs that don't grant quantitative FAR bonuses
+        _INFO_ONLY_CATEGORIES = {
+            ProgramCategory.USE_FLEXIBILITY,
+            ProgramCategory.RESILIENCE,
+            ProgramCategory.LARGE_SCALE,
+        }
+
+        bonus_programs = []
+        for r in program_results:
+            if not r.applicable or not r.effect:
+                continue
+            if r.program_key in _SKIP_KEYS:
+                continue
+            if r.category in _INFO_ONLY_CATEGORIES:
+                continue
+            if r.effect.far_bonus <= 0 and r.effect.far_override is None:
+                continue
+            bonus_programs.append(r)
+
+        if not bonus_programs:
+            return []
+
+        lot_area = lot.lot_area or 0
+        footprint = self._calculate_footprint(lot, envelope)
+        scenarios: list[DevelopmentScenario] = []
+
+        # ── Individual bonus scenarios ──
+        for prog in bonus_programs:
+            bonus_far = prog.effect.far_bonus
+            if bonus_far <= 0:
+                continue
+
+            bonus_envelope = ZoningEnvelope(
+                residential_far=(envelope.residential_far or 0) + bonus_far,
+                commercial_far=envelope.commercial_far,
+                cf_far=envelope.cf_far,
+                max_residential_zfa=((envelope.residential_far or 0) + bonus_far) * lot_area,
+                max_building_height=envelope.max_building_height,
+                base_height_min=envelope.base_height_min,
+                base_height_max=envelope.base_height_max,
+                sky_exposure_plane=envelope.sky_exposure_plane,
+                setbacks=envelope.setbacks,
+                quality_housing=envelope.quality_housing,
+                height_factor=envelope.height_factor,
+                rear_yard=envelope.rear_yard,
+                front_yard=envelope.front_yard,
+                side_yards_required=envelope.side_yards_required,
+                side_yard_width=envelope.side_yard_width,
+                lot_coverage_max=envelope.lot_coverage_max,
+            )
+
+            from app.zoning_engine.building_types import get_max_units_by_du_factor
+            new_far = (envelope.residential_far or 0) + bonus_far
+            bonus_du = get_max_units_by_du_factor(district, new_far * lot_area)
+
+            scenario = self._build_residential_scenario(
+                lot, bonus_envelope, district, footprint,
+                f"Max Res + {prog.program_name}",
+                f"Base FAR {envelope.residential_far or 0:.2f} + "
+                f"{bonus_far:.2f} bonus ({prog.program_name}). "
+                f"Total FAR {new_far:.2f}.",
+                max_units_by_du=bonus_du,
+            )
+            if scenario:
+                scenarios.append(scenario)
+
+        # ── Combined "All Programs" scenario ──
+        if len(bonus_programs) >= 2:
+            total_bonus = sum(p.effect.far_bonus for p in bonus_programs if p.effect)
+            if total_bonus > 0:
+                combined_far = (envelope.residential_far or 0) + total_bonus
+                combined_envelope = ZoningEnvelope(
+                    residential_far=combined_far,
+                    commercial_far=envelope.commercial_far,
+                    cf_far=envelope.cf_far,
+                    max_residential_zfa=combined_far * lot_area,
+                    max_building_height=envelope.max_building_height,
+                    base_height_min=envelope.base_height_min,
+                    base_height_max=envelope.base_height_max,
+                    sky_exposure_plane=envelope.sky_exposure_plane,
+                    setbacks=envelope.setbacks,
+                    quality_housing=envelope.quality_housing,
+                    height_factor=envelope.height_factor,
+                    rear_yard=envelope.rear_yard,
+                    front_yard=envelope.front_yard,
+                    side_yards_required=envelope.side_yards_required,
+                    side_yard_width=envelope.side_yard_width,
+                    lot_coverage_max=envelope.lot_coverage_max,
+                )
+
+                from app.zoning_engine.building_types import get_max_units_by_du_factor
+                combined_du = get_max_units_by_du_factor(district, combined_far * lot_area)
+
+                names = ", ".join(p.program_name for p in bonus_programs)
+                scenario = self._build_residential_scenario(
+                    lot, combined_envelope, district, footprint,
+                    "Max Development (All Programs)",
+                    f"All applicable bonuses stacked: {names}. "
+                    f"Total FAR {combined_far:.2f} (+{total_bonus:.2f} bonus).",
+                    max_units_by_du=combined_du,
+                )
+                if scenario:
+                    scenarios.append(scenario)
+
+        return scenarios
 
     # ──────────────────────────────────────────────────────────────
     # SCENARIO BUILDERS

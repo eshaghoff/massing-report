@@ -306,30 +306,41 @@ MANUFACTURING_FAR = {
 # Commercial overlays add commercial FAR on top of residential base district.
 # The overlay determines max commercial floor area.
 COMMERCIAL_OVERLAY_FAR = {
-    "C1-1": 1.0,
-    "C1-2": 1.0,
-    "C1-3": 1.0,
-    "C1-4": 1.0,
-    "C1-5": 1.0,
-    "C2-1": 1.0,
-    "C2-2": 1.0,
-    "C2-3": 1.0,
-    "C2-4": 1.0,
-    "C2-5": 1.0,
+    # C1 overlays (local retail)
+    "C1-1": 1.0, "C1-2": 1.0, "C1-3": 1.0, "C1-4": 1.0, "C1-5": 1.0,
+    # C2 overlays (local service)
+    "C2-1": 1.0, "C2-2": 1.0, "C2-3": 1.0, "C2-4": 1.0, "C2-5": 1.0,
+    # C3 overlays (waterfront/resort — rare as overlays)
+    "C3": 0.5, "C3A": 0.5,
+    # C4 (general commercial)
+    "C4-1": 1.0, "C4-2": 2.0, "C4-2A": 2.0, "C4-3": 2.0, "C4-3A": 3.0,
+    "C4-4": 3.4, "C4-4A": 4.0, "C4-5": 3.4, "C4-5A": 4.0,
+    "C4-5D": 4.0, "C4-5X": 5.0, "C4-6": 3.4, "C4-6A": 4.0, "C4-7": 3.4,
+    # C5 (central commercial — typically standalone, rare as overlay)
+    "C5-1": 10.0, "C5-2": 10.0, "C5-2.5": 10.0, "C5-3": 10.0, "C5-5": 10.0,
+    # C6 (general central commercial)
+    "C6-1": 6.0, "C6-1A": 6.0, "C6-2": 6.0, "C6-2A": 6.0, "C6-2M": 6.0,
+    "C6-3": 6.0, "C6-3A": 6.0, "C6-3D": 6.0, "C6-3X": 6.0,
+    "C6-4": 10.0, "C6-4A": 10.0, "C6-4M": 10.0, "C6-4X": 10.0,
+    "C6-5": 10.0, "C6-5.5": 10.0, "C6-6": 12.0, "C6-6.5": 12.0,
+    "C6-7": 12.0, "C6-7T": 12.0, "C6-9": 12.0,
+    # C7 (amusement — not typically used as overlay)
+    "C7": 2.0,
+    # C8 (automotive / heavy commercial)
+    "C8-1": 1.0, "C8-2": 2.0, "C8-3": 2.0, "C8-4": 5.0,
 }
 
 # Ground floor commercial depth limits for overlays
 OVERLAY_COMMERCIAL_DEPTH = {
-    "C1-1": 40,  # 40 ft from street line
-    "C1-2": 40,
-    "C1-3": 40,
-    "C1-4": 40,
-    "C1-5": 40,
-    "C2-1": 40,
-    "C2-2": 40,
-    "C2-3": 40,
-    "C2-4": 40,
-    "C2-5": 40,
+    # C1 overlays: 40 ft from street line
+    "C1-1": 40, "C1-2": 40, "C1-3": 40, "C1-4": 40, "C1-5": 40,
+    # C2 overlays: 40 ft from street line
+    "C2-1": 40, "C2-2": 40, "C2-3": 40, "C2-4": 40, "C2-5": 40,
+    # C3: 100 ft depth (waterfront)
+    "C3": 100, "C3A": 100,
+    # C4-1 through C4-3: 150 ft; C4-4+: full lot depth
+    "C4-1": 150, "C4-2": 150, "C4-2A": 150, "C4-3": 150, "C4-3A": 150,
+    # C4-4+, C5, C6, C7, C8: no depth limit (full lot)
 }
 
 # ──────────────────────────────────────────────────────────────────

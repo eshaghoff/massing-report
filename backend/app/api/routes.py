@@ -8,6 +8,8 @@ from fastapi.responses import FileResponse, StreamingResponse
 from app.models.schemas import (
     LotProfile, CalculationResult, AssemblageRequest, ReportRequest,
     SpecialDistrictInfo,
+
+    ProgramsSummary, ProgramApplicability,
 )
 import asyncio
 
@@ -29,6 +31,43 @@ from app.config import settings
 router = APIRouter(prefix="/api")
 calculator = ZoningCalculator()
 
+
+
+def _build_programs_summary(calc_result: dict):
+    """Convert raw program results from calculator into ProgramsSummary schema."""
+    programs_data = calc_result.get("programs")
+    if not programs_data:
+        return None
+    raw_results = programs_data.get("results", [])
+    effects = programs_data.get("effects_summary", {})
+
+    all_progs = []
+    for r in raw_results:
+        all_progs.append(ProgramApplicability(
+            program_key=r.program_key,
+            program_name=r.program_name,
+            category=r.category.value if hasattr(r.category, 'value') else str(r.category),
+            applicable=r.applicable,
+            eligible=r.eligible,
+            far_bonus=r.effect.far_bonus if r.effect else 0,
+            height_bonus_ft=r.effect.height_bonus_ft if r.effect else 0,
+            parking_reduction_pct=r.effect.parking_reduction_pct if r.effect else 0,
+            description=r.effect.description if r.effect else "",
+            reason=r.reason,
+            source_zr=r.source_zr,
+            details=r.effect.details if r.effect else {},
+        ))
+
+    applicable = [p for p in all_progs if p.applicable]
+
+    return ProgramsSummary(
+        programs=all_progs,
+        applicable_programs=applicable,
+        total_far_bonus=effects.get("total_far_bonus", 0),
+        total_height_bonus_ft=effects.get("total_height_bonus_ft", 0),
+        use_restrictions=effects.get("use_restrictions", []),
+        mandatory_affordable_pct=effects.get("mandatory_affordable_pct", 0),
+    )
 
 @router.get("/lookup")
 async def lookup_address(address: str = Query(..., description="NYC street address")):
@@ -79,6 +118,7 @@ async def lookup_address(address: str = Query(..., description="NYC street addre
         street_wall=result.get("street_wall"),
         special_districts=SpecialDistrictInfo(**result["special_districts"]) if result.get("special_districts") else None,
         city_of_yes=result.get("city_of_yes"),
+            programs=_build_programs_summary(result),
     )
 
 
@@ -129,6 +169,7 @@ async def calculate_zoning(lot_profile: LotProfile):
         street_wall=result.get("street_wall"),
         special_districts=SpecialDistrictInfo(**result["special_districts"]) if result.get("special_districts") else None,
         city_of_yes=result.get("city_of_yes"),
+            programs=_build_programs_summary(result),
     )
 
 
@@ -260,6 +301,7 @@ async def create_assemblage(request: AssemblageRequest):
             street_wall=result.get("street_wall"),
             special_districts=SpecialDistrictInfo(**result["special_districts"]) if result.get("special_districts") else None,
             city_of_yes=result.get("city_of_yes"),
+            programs=_build_programs_summary(result),
         ),
         "individual_lots": lots_data,
         "individual_totals": individual_totals,
@@ -300,6 +342,7 @@ async def create_report(request: ReportRequest):
         street_wall=calc_result.get("street_wall"),
         special_districts=SpecialDistrictInfo(**calc_result["special_districts"]) if calc_result.get("special_districts") else None,
         city_of_yes=calc_result.get("city_of_yes"),
+        programs=_build_programs_summary(calc_result),
     )
 
     # Fetch map images for the report
@@ -625,6 +668,7 @@ async def full_analysis(
         street_wall=calc_result.get("street_wall"),
         special_districts=SpecialDistrictInfo(**calc_result["special_districts"]) if calc_result.get("special_districts") else None,
         city_of_yes=calc_result.get("city_of_yes"),
+        programs=_build_programs_summary(calc_result),
     )
 
     # Fetch map images for the report (concurrent)

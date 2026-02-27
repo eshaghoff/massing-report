@@ -1205,6 +1205,278 @@ def _build_zoning_overview(story, styles, lot, env, map_images=None):
 # SECTION 6: DETAILED CALCULATIONS
 # ──────────────────────────────────────────────────────────────────
 
+
+# ──────────────────────────────────────────────────────────────────
+# SECTION 5b: APPLICABLE ZONING PROGRAMS
+# ──────────────────────────────────────────────────────────────────
+
+def _build_programs_section(story, styles, result):
+    """Section 5b: Comprehensive zoning program applicability analysis.
+
+    Shows applicable programs as highlighted cards with gold accent,
+    and lists non-applicable programs in a compact table with reasons.
+    """
+    programs_summary = getattr(result, 'programs', None)
+    if not programs_summary:
+        return
+
+    all_progs = programs_summary.programs or []
+    applicable = [p for p in all_progs if p.applicable]
+    non_applicable = [p for p in all_progs if not p.applicable]
+
+    if not all_progs:
+        return
+
+    story.append(PageBreak())
+    story.append(_section_header("Zoning Program Analysis", section_num=None, styles=styles))
+    story.append(Spacer(1, 4))
+
+    # Intro paragraph
+    n_total = len(all_progs)
+    n_applicable = len(applicable)
+    intro_text = (
+        f"This property was evaluated against <b>{n_total} zoning programs</b> "
+        f"including affordable housing incentives, commercial bonuses, special district "
+        f"provisions, transfer of development rights, and regulatory restrictions. "
+    )
+    if n_applicable > 0:
+        intro_text += (
+            f"<b>{n_applicable} program{'s' if n_applicable != 1 else ''}</b> "
+            f"{'are' if n_applicable != 1 else 'is'} applicable to this site."
+        )
+    else:
+        intro_text += "No bonus programs are applicable to this site."
+    story.append(Paragraph(intro_text, styles['Body']))
+    story.append(Spacer(1, 6))
+
+    # Summary metrics row
+    if n_applicable > 0:
+        total_far = programs_summary.total_far_bonus or 0
+        total_ht = programs_summary.total_height_bonus_ft or 0
+        restrictions = programs_summary.use_restrictions or []
+        afford_pct = programs_summary.mandatory_affordable_pct or 0
+
+        metric_cells = []
+        metric_labels = []
+        metric_cells.append(Paragraph(f"<b>{n_applicable}</b>", styles['MetricNumber']))
+        metric_labels.append(Paragraph("Applicable Programs", styles['MetricLabel']))
+
+        if total_far > 0:
+            metric_cells.append(Paragraph(f"<b>+{total_far:.2f}</b>", styles['MetricNumber']))
+            metric_labels.append(Paragraph("Total FAR Bonus", styles['MetricLabel']))
+        else:
+            metric_cells.append(Paragraph("<b>0</b>", styles['MetricNumber']))
+            metric_labels.append(Paragraph("FAR Bonus", styles['MetricLabel']))
+
+        if total_ht > 0:
+            metric_cells.append(Paragraph(f"<b>+{total_ht:.0f}\'</b>", styles['MetricNumber']))
+            metric_labels.append(Paragraph("Height Bonus", styles['MetricLabel']))
+        elif afford_pct > 0:
+            metric_cells.append(Paragraph(f"<b>{afford_pct:.0f}%</b>", styles['MetricNumber']))
+            metric_labels.append(Paragraph("Affordable Req.", styles['MetricLabel']))
+        else:
+            metric_cells.append(Paragraph(f"<b>{len(restrictions)}</b>", styles['MetricNumber']))
+            metric_labels.append(Paragraph("Restrictions", styles['MetricLabel']))
+
+        n_non = len(non_applicable)
+        metric_cells.append(Paragraph(f"<b>{n_non}</b>", styles['MetricNumber']))
+        metric_labels.append(Paragraph("Not Applicable", styles['MetricLabel']))
+
+        col_w = CONTENT_W / 4
+        mt = Table([metric_cells, metric_labels], colWidths=[col_w] * 4)
+        mt.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, -1), LIGHT_BG),
+            ('TOPPADDING', (0, 0), (-1, 0), 12),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 2),
+            ('TOPPADDING', (0, 1), (-1, 1), 0),
+            ('BOTTOMPADDING', (0, 1), (-1, 1), 10),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('LINEBEFORE', (1, 0), (1, -1), 0.25, GRID_COLOR),
+            ('LINEBEFORE', (2, 0), (2, -1), 0.25, GRID_COLOR),
+            ('LINEBEFORE', (3, 0), (3, -1), 0.25, GRID_COLOR),
+        ]))
+        story.append(mt)
+        story.append(Spacer(1, 10))
+
+    # ── Applicable programs: Gold-accent cards ──
+    if applicable:
+        story.append(Paragraph(
+            "<b>Applicable Programs</b>",
+            ParagraphStyle('ApplicableHeader', fontSize=13, fontName='Helvetica-Bold',
+                           textColor=DARK, spaceAfter=6, spaceBefore=4),
+        ))
+
+        _CAT_ORDER = {
+            'affordable_housing': 0, 'commercial_bonus': 1, 'special_district': 2,
+            'transfer_rights': 3, 'large_scale': 4, 'use_flexibility': 5,
+            'bulk_envelope': 6, 'overlay': 7, 'resilience': 8,
+        }
+        sorted_applicable = sorted(applicable, key=lambda p: _CAT_ORDER.get(p.category, 99))
+
+        for prog in sorted_applicable:
+            card = _build_program_card(prog, styles)
+            story.append(card)
+            story.append(Spacer(1, 4))
+
+    # ── Non-applicable programs: Compact table ──
+    if non_applicable:
+        story.append(Spacer(1, 6))
+        story.append(Paragraph(
+            "<b>Programs Evaluated \u2014 Not Applicable</b>",
+            ParagraphStyle('NonApplicableHeader', fontSize=11, fontName='Helvetica-Bold',
+                           textColor=GREY, spaceAfter=4, spaceBefore=6),
+        ))
+        story.append(Paragraph(
+            "The following programs were checked but do not apply to this property:",
+            ParagraphStyle('NonApplicableIntro', fontSize=9, fontName='Helvetica',
+                           textColor=GREY, spaceAfter=4),
+        ))
+
+        _CAT_LABELS = {
+            'affordable_housing': 'Affordable Housing',
+            'commercial_bonus': 'Commercial Bonus',
+            'special_district': 'Special District',
+            'transfer_rights': 'Transfer Rights',
+            'large_scale': 'Large-Scale Dev.',
+            'use_flexibility': 'Use Flexibility',
+            'bulk_envelope': 'Bulk/Envelope',
+            'overlay': 'Overlay',
+            'resilience': 'Resilience',
+        }
+
+        header_style = ParagraphStyle(
+            'NonApplHdr', fontSize=8, fontName='Helvetica-Bold', textColor=WHITE,
+        )
+        cell_style = ParagraphStyle(
+            'NonApplCell', fontSize=8, fontName='Helvetica', textColor=DARK, leading=10,
+        )
+        reason_style = ParagraphStyle(
+            'NonApplReason', fontSize=8, fontName='Helvetica', textColor=GREY, leading=10,
+        )
+
+        data = [
+            [
+                Paragraph("Program", header_style),
+                Paragraph("Category", header_style),
+                Paragraph("Reason", header_style),
+            ]
+        ]
+        for prog in non_applicable:
+            cat_label = _CAT_LABELS.get(prog.category, prog.category.replace('_', ' ').title())
+            reason = prog.reason or "Not applicable"
+            if len(reason) > 80:
+                reason = reason[:77] + "..."
+            data.append([
+                Paragraph(prog.program_name, cell_style),
+                Paragraph(cat_label, cell_style),
+                Paragraph(reason, reason_style),
+            ])
+
+        col_widths = [2.0 * inch, 1.3 * inch, 3.2 * inch]
+        t = Table(data, colWidths=col_widths, repeatRows=1)
+        style_cmds = [
+            ('BACKGROUND', (0, 0), (-1, 0), BLUE_DARK),
+            ('TEXTCOLOR', (0, 0), (-1, 0), WHITE),
+            ('FONTSIZE', (0, 0), (-1, -1), 8),
+            ('TOPPADDING', (0, 0), (-1, -1), 4),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+            ('LEFTPADDING', (0, 0), (-1, -1), 6),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 6),
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ('LINEBELOW', (0, 0), (-1, -2), 0.25, GRID_COLOR),
+            ('LINEBELOW', (0, -1), (-1, -1), 0.5, GRID_COLOR),
+        ]
+        for i in range(1, len(data)):
+            if i % 2 == 0:
+                style_cmds.append(('BACKGROUND', (0, i), (-1, i), LIGHT_BG))
+        t.setStyle(TableStyle(style_cmds))
+        story.append(t)
+
+    story.append(Spacer(1, 6))
+
+
+def _build_program_card(prog, styles):
+    """Build a single applicable program card with gold left border."""
+    _CAT_LABELS = {
+        'affordable_housing': 'Affordable Housing',
+        'commercial_bonus': 'Commercial Bonus',
+        'special_district': 'Special District',
+        'transfer_rights': 'Transfer Rights',
+        'large_scale': 'Large-Scale Dev.',
+        'use_flexibility': 'Use Flexibility',
+        'bulk_envelope': 'Bulk/Envelope',
+        'overlay': 'Overlay',
+        'resilience': 'Resilience',
+    }
+
+    name = prog.program_name
+    cat = _CAT_LABELS.get(prog.category, prog.category.replace('_', ' ').title())
+    source = prog.source_zr or ""
+    desc = prog.description or ""
+    far_bonus = prog.far_bonus or 0
+    ht_bonus = prog.height_bonus_ft or 0
+    parking_red = getattr(prog, 'parking_reduction_pct', 0) or 0
+
+    badges = []
+    if far_bonus > 0:
+        badges.append(f"+{far_bonus:.2f} FAR")
+    if ht_bonus > 0:
+        badges.append(f"+{ht_bonus:.0f}\' Height")
+    if parking_red > 0:
+        badges.append(f"-{parking_red:.0f}% Parking")
+
+    title_style = ParagraphStyle(
+        'CardTitle', fontSize=10.5, fontName='Helvetica-Bold', textColor=DARK, leading=13,
+    )
+    badge_style = ParagraphStyle(
+        'CardBadge', fontSize=8, fontName='Helvetica-Bold', textColor=BLUE, leading=10,
+    )
+    cat_style = ParagraphStyle(
+        'CardCat', fontSize=8, fontName='Helvetica', textColor=GREY, leading=10,
+    )
+    desc_style = ParagraphStyle(
+        'CardDesc', fontSize=9, fontName='Helvetica',
+        textColor=colors.HexColor('#444444'), leading=12,
+    )
+
+    badge_text = "  |  ".join(badges) if badges else ""
+    title_para = Paragraph(name, title_style)
+    meta_parts = [cat]
+    if source:
+        meta_parts.append(source)
+    meta_para = Paragraph(" \u00b7 ".join(meta_parts), cat_style)
+
+    content_rows = [[title_para]]
+    if badge_text:
+        content_rows.append([Paragraph(badge_text, badge_style)])
+    content_rows.append([meta_para])
+    if desc:
+        if len(desc) > 200:
+            desc = desc[:197] + "..."
+        content_rows.append([Paragraph(desc, desc_style)])
+
+    inner = Table(content_rows, colWidths=[CONTENT_W - 20])
+    inner.setStyle(TableStyle([
+        ('TOPPADDING', (0, 0), (-1, -1), 1),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 1),
+        ('LEFTPADDING', (0, 0), (-1, -1), 0),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 0),
+    ]))
+
+    outer = Table([[inner]], colWidths=[CONTENT_W - 8])
+    outer.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, -1), GOLD_LIGHT),
+        ('TOPPADDING', (0, 0), (-1, -1), 8),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+        ('LEFTPADDING', (0, 0), (-1, -1), 12),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 8),
+        ('LINEBEFORE', (0, 0), (0, -1), 3, GOLD),
+    ]))
+
+    return KeepTogether([outer])
+
+
 def _build_calculation_breakdown(story, styles, lot, env):
     """Section 6: Show-your-work calculations in two-column layout."""
     story.append(PageBreak())
@@ -2201,6 +2473,9 @@ def generate_report(
     # 5. Zoning overview (with zoning map)
     _build_zoning_overview(story, styles, lot, env, map_images=map_images)
 
+    # 5b. Zoning program analysis
+    _build_programs_section(story, styles, result)
+
     # 6. Detailed calculations
     _build_calculation_breakdown(story, styles, lot, env)
 
@@ -2261,6 +2536,7 @@ def generate_report_bytes(
     _build_site_summary(story, styles, lot, env)
     _build_highlighted_features(story, styles, lot, env, scenarios=result.scenarios)
     _build_zoning_overview(story, styles, lot, env, map_images=map_images)
+    _build_programs_section(story, styles, result)
     _build_calculation_breakdown(story, styles, lot, env)
     _build_development_scenarios(story, styles, result.scenarios,
                                  lot=lot, envelope=env, massing_models=massing_models)

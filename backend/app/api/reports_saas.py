@@ -33,7 +33,7 @@ from app.zoning_engine.massing_builder import build_massing_model
 from app.zoning_engine.building_program import generate_building_program
 from app.zoning_engine.parking_layout import evaluate_parking_layouts
 from app.zoning_engine.valuation import rank_scenarios
-from app.models.schemas import CalculationResult, SpecialDistrictInfo
+from app.models.schemas import CalculationResult, SpecialDistrictInfo, ProgramsSummary, ProgramApplicability
 
 router = APIRouter(prefix="/api/v1/saas/reports", tags=["saas-reports"])
 calculator = ZoningCalculator()
@@ -387,6 +387,7 @@ async def _generate_report_task(report_id: str, req: GenerateRequest, user: User
                 if calc_result.get("special_districts") else None
             ),
             city_of_yes=calc_result.get("city_of_yes"),
+            programs=_build_programs_summary(calc_result),
         )
 
         # Generate PDF
@@ -730,6 +731,43 @@ async def preview_assemblage(
 
 
 # ── Helper functions ──
+
+
+def _build_programs_summary(calc_result: dict):
+    """Convert raw program results from calculator into ProgramsSummary schema."""
+    programs_data = calc_result.get("programs")
+    if not programs_data:
+        return None
+    raw_results = programs_data.get("results", [])
+    effects = programs_data.get("effects_summary", {})
+
+    all_progs = []
+    for r in raw_results:
+        all_progs.append(ProgramApplicability(
+            program_key=r.program_key,
+            program_name=r.program_name,
+            category=r.category.value if hasattr(r.category, 'value') else str(r.category),
+            applicable=r.applicable,
+            eligible=r.eligible,
+            far_bonus=r.effect.far_bonus if r.effect else 0,
+            height_bonus_ft=r.effect.height_bonus_ft if r.effect else 0,
+            parking_reduction_pct=r.effect.parking_reduction_pct if r.effect else 0,
+            description=r.effect.description if r.effect else "",
+            reason=r.reason,
+            source_zr=r.source_zr,
+            details=r.effect.details if r.effect else {},
+        ))
+
+    applicable = [p for p in all_progs if p.applicable]
+
+    return ProgramsSummary(
+        programs=all_progs,
+        applicable_programs=applicable,
+        total_far_bonus=effects.get("total_far_bonus", 0),
+        total_height_bonus_ft=effects.get("total_height_bonus_ft", 0),
+        use_restrictions=effects.get("use_restrictions", []),
+        mandatory_affordable_pct=effects.get("mandatory_affordable_pct", 0),
+    )
 
 def _lot_summary(lot: LotProfile, keep_building: bool) -> dict:
     """Build a summary dict for one lot."""

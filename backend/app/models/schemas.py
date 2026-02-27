@@ -219,6 +219,33 @@ class SpecialDistrictInfo(BaseModel):
     tdr_available: bool = False
 
 
+
+class ProgramApplicability(BaseModel):
+    """Result of checking one zoning program against a property."""
+    program_key: str
+    program_name: str
+    category: str
+    applicable: bool
+    eligible: bool
+    far_bonus: float = 0
+    height_bonus_ft: float = 0
+    parking_reduction_pct: float = 0
+    description: str = ""
+    reason: str = ""
+    source_zr: str = ""
+    details: dict = {}
+
+
+class ProgramsSummary(BaseModel):
+    """Summary of all program checks for a property."""
+    programs: list[ProgramApplicability] = []
+    applicable_programs: list[ProgramApplicability] = []
+    total_far_bonus: float = 0
+    total_height_bonus_ft: float = 0
+    use_restrictions: list[str] = []
+    mandatory_affordable_pct: float = 0
+
+
 class CalculationResult(BaseModel):
     lot_profile: LotProfile
     zoning_envelope: ZoningEnvelope
@@ -227,6 +254,7 @@ class CalculationResult(BaseModel):
     street_wall: Optional[dict] = None
     special_districts: Optional[SpecialDistrictInfo] = None
     city_of_yes: Optional[dict] = None
+    programs: Optional[ProgramsSummary] = None
 
 
 class AssemblageRequest(BaseModel):
