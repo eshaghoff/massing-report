@@ -639,7 +639,7 @@ def _build_property_maps(story, styles, lot, map_images):
     bottom_right = _map_cell(
         "Street View",
         map_images.get("street_view_bytes") if map_images else None,
-        "Street-level imagery. Source: Mapillary.",
+        "Street-level imagery. Source: Google Street View.",
     )
 
     # Build the grid — handle missing images gracefully

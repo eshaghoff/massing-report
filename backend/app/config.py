@@ -10,7 +10,6 @@ class Settings(BaseSettings):
     nyc_geoclient_app_id: str = ""
     nyc_geoclient_app_key: str = ""
     google_maps_api_key: str = ""
-    mapillary_access_token: str = ""
     socrata_app_token: str = ""
     cors_origins: list[str] = [
         "http://localhost:3000",

@@ -1002,70 +1002,69 @@ async def fetch_neighborhood_map_image(
 
 
 # ──────────────────────────────────────────────────────────────────
-# STREET VIEW (MAPILLARY)
+# STREET VIEW (GOOGLE)
 # ──────────────────────────────────────────────────────────────────
+
+GOOGLE_STREETVIEW_URL = "https://maps.googleapis.com/maps/api/streetview"
 
 async def fetch_street_view_image(
     lat: float,
     lng: float,
+    width: int = 640,
+    height: int = 480,
 ) -> bytes | None:
-    """Fetch a street-level image from Mapillary (free, no Google API needed).
+    """Fetch a street-level image from Google Street View Static API.
 
-    Queries Mapillary API v4 for the closest image to the given coordinates,
-    picks the most recent one, and fetches the 2048px thumbnail.
-
-    Returns image bytes or None if no coverage / no token / error.
+    Uses the Google Maps API key to request a street view image at the
+    given coordinates.  Returns image bytes or None if no coverage / no
+    key / error.
     """
-    token = settings.mapillary_access_token
-    if not token:
-        logger.info("No Mapillary access token configured — skipping street view")
+    api_key = settings.google_maps_api_key
+    if not api_key:
+        logger.info("No Google Maps API key configured \u2014 skipping street view")
         return None
 
-    # Search for images within ~100ft of the coordinates
-    delta = 0.0003  # ~100ft in degrees
-    bbox_str = f"{lng - delta},{lat - delta},{lng + delta},{lat + delta}"
-
-    search_url = "https://graph.mapillary.com/images"
     params = {
-        "access_token": token,
-        "fields": "id,thumb_2048_url,captured_at",
-        "bbox": bbox_str,
-        "limit": "5",
+        "size": f"{width}x{height}",
+        "location": f"{lat},{lng}",
+        "fov": "90",
+        "heading": "0",
+        "pitch": "10",
+        "key": api_key,
+        "source": "outdoor",
     }
 
     try:
         async with httpx.AsyncClient(timeout=15) as client:
-            resp = await client.get(search_url, params=params)
-            if resp.status_code != 200:
-                logger.warning("Mapillary search returned status %s", resp.status_code)
-                return None
-            data = resp.json()
+            # First check metadata to see if coverage exists
+            meta_params = {**params}
+            meta_params.pop("size", None)
+            meta_resp = await client.get(
+                f"{GOOGLE_STREETVIEW_URL}/metadata", params=meta_params
+            )
+            if meta_resp.status_code == 200:
+                meta = meta_resp.json()
+                if meta.get("status") != "OK":
+                    logger.info(
+                        "No Google Street View coverage near %.6f, %.6f (status=%s)",
+                        lat, lng, meta.get("status"),
+                    )
+                    return None
 
-        images = data.get("data", [])
-        if not images:
-            logger.info("No Mapillary coverage near %.6f, %.6f", lat, lng)
-            return None
-
-        # Pick the most recent image
-        images.sort(key=lambda x: x.get("captured_at", 0), reverse=True)
-        best = images[0]
-        thumb_url = best.get("thumb_2048_url")
-        if not thumb_url:
-            logger.warning("Mapillary image %s has no thumb_2048_url", best.get("id"))
-            return None
-
-        # Fetch the image bytes
-        async with httpx.AsyncClient(timeout=15) as client:
-            img_resp = await client.get(thumb_url)
-            if img_resp.status_code == 200 and img_resp.headers.get("content-type", "").startswith("image"):
+            # Fetch the actual image
+            img_resp = await client.get(GOOGLE_STREETVIEW_URL, params=params)
+            if img_resp.status_code == 200 and img_resp.headers.get(
+                "content-type", ""
+            ).startswith("image"):
                 return img_resp.content
-            logger.warning("Mapillary thumbnail fetch returned status %s", img_resp.status_code)
+            logger.warning(
+                "Google Street View fetch returned status %s", img_resp.status_code
+            )
             return None
 
     except Exception as exc:
-        logger.warning("Mapillary street view fetch failed: %s", exc)
+        logger.warning("Google Street View fetch failed: %s", exc)
         return None
-
 
 async def _fetch_zoning_districts(
     bbox: tuple[float, float, float, float],
