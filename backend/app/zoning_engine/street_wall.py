@@ -96,55 +96,74 @@ QH_STREET_WALL = {
 # ──────────────────────────────────────────────────────────────────
 
 SLIVER_LAW_THRESHOLD = 45  # ft — lots narrower than this are subject
-SLIVER_LAW_FACTOR = {
-    # District: height-to-width multiplier
-    # Building height ≤ lot_width × factor
-    "R6":   {"factor": 2.7, "max_stories": None},
-    "R7-1": {"factor": 3.0, "max_stories": None},
-    "R7-2": {"factor": 3.0, "max_stories": None},
-    "R8":   {"factor": 3.4, "max_stories": None},
-    "R9":   {"factor": 3.7, "max_stories": None},
-    "R10":  {"factor": 5.6, "max_stories": None},
+
+# Non-contextual districts subject to the sliver law (ZR 23-692)
+SLIVER_LAW_DISTRICTS = {
+    "R6", "R7-1", "R7-2", "R8", "R9", "R10",
 }
 
-# Also applies to C districts with residential equivalents
+# Commercial districts with residential equivalents subject to sliver law
 SLIVER_LAW_COMMERCIAL = {
     "C6-1":  "R7-2", "C6-2":  "R8", "C6-3":  "R9", "C6-4":  "R10",
     "C4-3":  "R7-1", "C4-4":  "R8", "C4-5":  "R9", "C4-6":  "R10",
 }
 
 
-def get_sliver_law_height(district: str, lot_width: float) -> float | None:
+def get_sliver_law_height(
+    district: str,
+    lot_width: float,
+    street_width_ft: float | None = None,
+    lot_type: str = "interior",
+) -> float | None:
     """Calculate maximum building height under the Sliver Law.
 
-    ZR 23-692: In non-contextual districts, buildings on lots narrower
-    than 45 ft are limited to lot_width × factor in height.
+    ZR 23-692: In non-contextual R6-R10 districts, buildings with street
+    walls less than 45 ft in width are limited in height:
+      (a) Interior/through lots: lesser of street width or 100 ft
+      (b) Corner lots (narrow streets only): width of narrowest street
+      (c) Corner lots (at least one wide street): lesser of widest
+          street width or 100 ft
 
     Args:
         district: Zoning district
-        lot_width: Lot frontage width in feet
+        lot_width: Lot frontage / street wall width in feet
+        street_width_ft: Actual mapped street width in feet
+        lot_type: "interior", "corner", or "through"
 
     Returns:
         Maximum height in feet, or None if sliver law doesn't apply
     """
     if lot_width >= SLIVER_LAW_THRESHOLD:
-        return None  # Sliver law doesn't apply
+        return None  # Sliver law doesn't apply to wide street walls
 
     district = district.strip().upper()
 
-    # Check direct match
-    rules = SLIVER_LAW_FACTOR.get(district)
-
-    # Check commercial equivalent
-    if not rules:
+    # Check if district is subject to sliver law
+    is_sliver_district = district in SLIVER_LAW_DISTRICTS
+    if not is_sliver_district:
         equiv = SLIVER_LAW_COMMERCIAL.get(district)
-        if equiv:
-            rules = SLIVER_LAW_FACTOR.get(equiv)
+        if not equiv:
+            return None  # District not subject to sliver law
 
-    if not rules:
-        return None  # District not subject to sliver law
+    # Use actual street width if available, otherwise estimate
+    if street_width_ft is None:
+        # Fallback: assume 60ft for narrow, 80ft for wide
+        street_width_ft = 60.0
 
-    return lot_width * rules["factor"]
+    if lot_type == "corner":
+        # Corner lot rules depend on whether at least one street is wide
+        # We only have one street width — assume this is the primary street.
+        # ZR 23-692(b): narrow streets only → narrowest street width
+        # ZR 23-692(c): at least one wide street → min(widest, 100)
+        if street_width_ft >= 75:
+            # At least one wide street
+            return min(street_width_ft, 100.0)
+        else:
+            # Only narrow streets — use narrowest (= the one we know)
+            return street_width_ft
+    else:
+        # Interior and through lots: ZR 23-692(a)
+        return min(street_width_ft, 100.0)
 
 
 def get_street_wall_rules(district: str, street_width: str = "narrow") -> dict:

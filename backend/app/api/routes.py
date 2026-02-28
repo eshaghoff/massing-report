@@ -841,7 +841,7 @@ async def _build_lot_profile(bbl_result, pluto, geometry, zoning_layers) -> LotP
     lat = getattr(bbl_result, "latitude", None)
     lng = getattr(bbl_result, "longitude", None)
 
-    street_width = await determine_street_width(
+    street_width, street_width_ft = await determine_street_width(
         address=address,
         borough=borough,
         house_number=house_number,
@@ -871,6 +871,7 @@ async def _build_lot_profile(bbl_result, pluto, geometry, zoning_layers) -> LotP
         lot_depth=pluto.lotdepth if pluto else None,
         lot_type=lot_type,
         street_width=street_width,
+        street_width_ft=street_width_ft,
         is_historic_district=bool(
             pluto and (
                 (pluto.histdist and pluto.histdist.strip())

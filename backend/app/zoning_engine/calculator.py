@@ -40,6 +40,7 @@ from app.zoning_engine.building_types import (
     get_max_units_by_lot_area, get_max_units_by_du_factor,
     calculate_tower_footprint,
 )
+from app.zoning_engine.courts import calculate_court_requirements
 from app.zoning_engine.street_wall import (
     get_sliver_law_height, get_street_wall_rules,
 )
@@ -190,7 +191,7 @@ class ZoningCalculator:
         # ── Sliver law height limit ──
         max_bldg_height = height.get("max_building_height")
         lot_front = lot.lot_frontage or 50
-        sliver_height = get_sliver_law_height(district, lot_front)
+        sliver_height = get_sliver_law_height(district, lot_front, lot.street_width_ft, lot.lot_type)
         if sliver_height is not None:
             if max_bldg_height is not None:
                 max_bldg_height = min(max_bldg_height, sliver_height)
@@ -388,7 +389,7 @@ class ZoningCalculator:
 
             # Apply sliver law to HF buildings
             lot_front = lot.lot_frontage or 50
-            sliver_ht = get_sliver_law_height(district, lot_front)
+            sliver_ht = get_sliver_law_height(district, lot_front, lot.street_width_ft, lot.lot_type)
             if sliver_ht is not None:
                 hf_envelope.max_building_height = sliver_ht
 
@@ -501,7 +502,7 @@ class ZoningCalculator:
 
             # Apply sliver law
             lot_front = lot.lot_frontage or 50
-            sliver_ht = get_sliver_law_height(district, lot_front)
+            sliver_ht = get_sliver_law_height(district, lot_front, lot.street_width_ft, lot.lot_type)
             if sliver_ht is not None and uap_envelope.max_building_height:
                 uap_envelope.max_building_height = min(
                     uap_envelope.max_building_height, sliver_ht
@@ -555,6 +556,23 @@ class ZoningCalculator:
         if envelope.lot_coverage_max and lot_area > 0:
             max_coverage_sf = lot_area * (envelope.lot_coverage_max / 100)
             footprint = min(footprint, max_coverage_sf)
+
+        # Apply court deductions (ZR 23-84/85/86)
+        max_height = envelope.max_building_height or 120
+        district = lot.zoning_districts[0] if lot.zoning_districts else ''
+        court_req = calculate_court_requirements(
+            lot_depth=lot_depth,
+            lot_width=lot_front,
+            lot_type=lot.lot_type,
+            building_height=max_height,
+            footprint=footprint,
+            district=district,
+            rear_yard=envelope.rear_yard,
+            front_yard=envelope.front_yard,
+            side_yards=(envelope.side_yard_width * 2) if envelope.side_yards_required else 0,
+        )
+        if court_req.needs_inner_court:
+            footprint = court_req.effective_footprint
 
         return max(footprint, 0)
 

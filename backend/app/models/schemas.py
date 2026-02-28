@@ -78,6 +78,7 @@ class LotProfile(BaseModel):
     lot_depth: Optional[float] = None
     lot_type: str = "interior"  # interior, corner, through, irregular
     street_width: str = "narrow"  # narrow (<75ft) or wide (>=75ft)
+    street_width_ft: Optional[float] = None  # Actual mapped width in feet (for sliver law)
     is_mih_area: bool = False
     mih_option: Optional[str] = None
     is_historic_district: bool = False

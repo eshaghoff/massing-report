@@ -384,7 +384,7 @@ async def determine_street_width(
     borough_name: str = "",
     latitude: float | None = None,
     longitude: float | None = None,
-) -> str:
+) -> tuple[str, float | None]:
     """Determine street width classification for a property.
 
     Tries data sources in priority order:
@@ -403,13 +403,13 @@ async def determine_street_width(
         longitude: WGS84 longitude (if available from geocoding)
 
     Returns:
-        "wide" or "narrow"
+        Tuple of ("wide" or "narrow", numeric_width_ft or None)
     """
     # ── Source 1: DCP Digital City Map via spatial query (best) ──
     if latitude and longitude:
         width, dcm_street = await fetch_street_width_from_dcm(longitude, latitude)
         if width is not None:
-            return "wide" if width >= 75 else "narrow"
+            return ("wide" if width >= 75 else "narrow", width)
 
     # ── Source 2: Geoclient API (if key configured) ──
     if house_number and street_name and (borough_name or borough):
@@ -422,13 +422,16 @@ async def determine_street_width(
             house_number, street_name, boro_str
         )
         if width is not None:
-            return "wide" if width >= 75 else "narrow"
+            return ("wide" if width >= 75 else "narrow", width)
 
     # ── Source 3: DCP Digital City Map by street name (fallback) ──
     if street_name:
         width = await fetch_street_width_by_name(street_name, borough)
         if width is not None:
-            return "wide" if width >= 75 else "narrow"
+            return ("wide" if width >= 75 else "narrow", width)
 
     # ── Source 4: Address heuristic (last resort) ──
-    return "wide" if is_wide_street_heuristic(address, borough) else "narrow"
+    classification = "wide" if is_wide_street_heuristic(address, borough) else "narrow"
+    # Estimate numeric width from classification when no data available
+    fallback_ft = 80.0 if classification == "wide" else 60.0
+    return (classification, fallback_ft)
