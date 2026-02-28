@@ -242,8 +242,8 @@ def calculate_core(
         stairs = 3
     stair_sf = stairs * 150  # 150 SF per stair per floor
 
-    # Elevators: 1 per 8 floors, min 1 for 6+ stories
-    if num_floors < 6:
+    # Elevators — BC 3002.4: min 1 for 5+ stories
+    if num_floors < 5:
         elevators = 0
     elif num_floors <= 8:
         elevators = 1

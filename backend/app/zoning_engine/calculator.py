@@ -1825,20 +1825,19 @@ class ZoningCalculator:
         total_gross: float, use_type: str,
     ) -> CoreEstimate:
         """Estimate vertical core requirements."""
-        # Elevators — per NYC Building Code (§3002.4):
-        # < 6 stories: no elevator required
-        # 6-8 stories: 1 passenger elevator
-        # 9-16 stories: 2 passenger elevators
-        # 17-24 stories: 3 passenger elevators
-        # 25+ stories: 1 per ~8 floors, minimum 3
-        if num_floors < 6:
-            elevators = 0
+        # Elevators — per NYC Building Code BC 3002.4:
+        # "In buildings five stories in height or more... at least one
+        # elevator shall provide access to all floors."
+        # Code minimum is 1 for 5+ stories. Additional elevators are
+        # industry practice for acceptable wait times / occupant load.
+        if num_floors < 5:
+            elevators = 0        # No elevator required (< 5 stories)
         elif num_floors <= 8:
-            elevators = 1
+            elevators = 1        # Code minimum: 1 elevator
         elif num_floors <= 16:
-            elevators = 2
+            elevators = 2        # Industry practice: 2 for mid-rise
         elif num_floors <= 24:
-            elevators = 3
+            elevators = 3        # Industry practice: 3 for upper mid-rise
         else:
             elevators = max(3, math.ceil(num_floors / 8))
 
