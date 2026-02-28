@@ -31,6 +31,12 @@ from app.config import settings
 router = APIRouter(prefix="/api")
 calculator = ZoningCalculator()
 
+# Default calculation options (can be overridden per-request)
+_DEFAULT_CALC_OPTIONS = {
+    "include_cellar": True,
+    "include_inclusionary": False,
+}
+
 
 
 def _build_programs_summary(calc_result: dict):
@@ -425,7 +431,10 @@ async def get_massing(
     )
     lot_profile = await _build_lot_profile(bbl_result, pluto, geometry, zoning_layers)
 
-    calc_result = calculator.calculate(lot_profile)
+    calc_result = calculator.calculate(lot_profile, options={
+        "include_cellar": getattr(request, "include_cellar", True),
+        "include_inclusionary": getattr(request, "include_inclusionary", False),
+    })
     zoning_envelope = calc_result["zoning_envelope"]
     scenarios = calc_result["scenarios"]
     district = lot_profile.zoning_districts[0] if lot_profile.zoning_districts else ""
@@ -475,6 +484,8 @@ class FullAnalysisRequest(PydanticBaseModel):
     bbl: Opt[str] = None
     bbls: Opt[list[str]] = None  # for assemblage
     addresses: Opt[list[str]] = None  # for assemblage by addresses
+    include_cellar: bool = True       # Include cellar space (checked by default)
+    include_inclusionary: bool = False  # Include IH/UAP scenarios (unchecked by default)
 
 
 @router.post("/v1/full-analysis")
@@ -597,8 +608,12 @@ async def full_analysis(
         lot_profile.lot_area = lot_profile.lot_area or 5000  # Fallback
 
     # Run zoning calculations
+    calc_options = {
+        "include_cellar": getattr(request, "include_cellar", True),
+        "include_inclusionary": getattr(request, "include_inclusionary", False),
+    }
     try:
-        calc_result = calculator.calculate(lot_profile)
+        calc_result = calculator.calculate(lot_profile, options=calc_options)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
@@ -856,4 +871,15 @@ async def _build_lot_profile(bbl_result, pluto, geometry, zoning_layers) -> LotP
         lot_depth=pluto.lotdepth if pluto else None,
         lot_type=lot_type,
         street_width=street_width,
+        is_historic_district=bool(
+            pluto and (
+                (pluto.histdist and pluto.histdist.strip())
+                or (pluto.landmark and pluto.landmark.strip().upper() not in ("", "N"))
+            )
+        ),
+        landmark_name=(
+            pluto.landmark.strip()
+            if pluto and pluto.landmark and pluto.landmark.strip().upper() not in ("", "N")
+            else None
+        ),
     )

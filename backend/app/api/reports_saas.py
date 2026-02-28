@@ -47,6 +47,8 @@ _preview_cache: dict[str, dict] = {}
 class PreviewRequest(BaseModel):
     address: Optional[str] = None
     bbl: Optional[str] = None
+    include_cellar: bool = True
+    include_inclusionary: bool = False
 
 
 class GenerateRequest(BaseModel):
@@ -67,7 +69,7 @@ class ReportSummary(BaseModel):
 
 
 # ── Helper: run the zoning analysis (no PDF) ──
-async def _run_analysis(address: str = None, bbl: str = None):
+async def _run_analysis(address: str = None, bbl: str = None, **kwargs):
     """Run the full zoning analysis pipeline, returning structured data."""
     from app.api.routes import _build_lot_profile
     from app.models.schemas import LotProfile
@@ -137,8 +139,9 @@ async def _run_analysis(address: str = None, bbl: str = None):
             pass
 
     # Zoning calc
+    calc_options = kwargs.get("calc_options", {})
     try:
-        calc_result = calculator.calculate(lot_profile)
+        calc_result = calculator.calculate(lot_profile, options=calc_options if calc_options else None)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Zoning calculation error: {e}")
 
@@ -170,7 +173,10 @@ async def _run_analysis(address: str = None, bbl: str = None):
 @router.post("/preview")
 async def preview_report(req: PreviewRequest, user: UserInfo | None = Depends(get_optional_user)):
     """Run zoning analysis (no PDF) and return summary + price quote."""
-    analysis = await _run_analysis(address=req.address, bbl=req.bbl)
+    analysis = await _run_analysis(
+        address=req.address, bbl=req.bbl,
+        calc_options={"include_cellar": req.include_cellar, "include_inclusionary": req.include_inclusionary},
+    )
 
     lot = analysis["lot_profile"]
     envelope = analysis["zoning_envelope"]
@@ -279,7 +285,10 @@ async def _generate_report_task(report_id: str, req: GenerateRequest, user: User
                 analysis = cached["analysis"]
 
         if analysis is None:
-            analysis = await _run_analysis(address=req.address, bbl=req.bbl)
+            analysis = await _run_analysis(
+                address=req.address, bbl=req.bbl,
+                calc_options={"include_cellar": req.include_cellar, "include_inclusionary": req.include_inclusionary},
+            )
 
         lot_profile = analysis["lot_profile"]
         calc_result = analysis["calc_result"]
@@ -551,7 +560,10 @@ async def preview_assemblage(
     # ── Single lot, no air rights → standard flow ──
     if len(lot_profiles) == 1 and not has_air_rights:
         lot = lot_profiles[0]
-        calc_result = calculator.calculate(lot)
+        calc_result = calculator.calculate(lot, options={
+            "include_cellar": getattr(req, "include_cellar", True),
+            "include_inclusionary": getattr(req, "include_inclusionary", False),
+        })
         env = calc_result["zoning_envelope"]
         scenarios = calc_result["scenarios"]
 

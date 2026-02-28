@@ -54,6 +54,8 @@ class PlutoData(BaseModel):
     ct2010: Optional[str] = None
     cb2010: Optional[str] = None
     zipcode: Optional[str] = None
+    histdist: Optional[str] = None       # Historic district name
+    landmark: Optional[str] = None       # Individual landmark designation
 
 
 class LotProfile(BaseModel):
@@ -79,6 +81,7 @@ class LotProfile(BaseModel):
     is_mih_area: bool = False
     mih_option: Optional[str] = None
     is_historic_district: bool = False
+    landmark_name: Optional[str] = None   # Individual landmark name (from PLUTO)
     flood_zone: Optional[str] = None
     coastal_zone: bool = False
     neighborhood: Optional[str] = None
@@ -197,6 +200,7 @@ class DevelopmentScenario(BaseModel):
     commercial_sf: float = 0
     cf_sf: float = 0
     parking_sf: float = 0
+    cellar_sf: float = 0               # Cellar (below grade, exempt from FAR)
     total_units: int = 0
     unit_mix: Optional[UnitMixResult] = None
     parking: Optional[ParkingResult] = None

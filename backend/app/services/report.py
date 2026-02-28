@@ -1648,6 +1648,8 @@ def _build_highlight_badges(scenario, lot=None, envelope=None):
         badges.append(("positive", "MIH Required"))
     if "Tower" in scenario.name:
         badges.append(("technical", "Tower-on-Base"))
+    if getattr(scenario, 'cellar_sf', 0) > 0:
+        badges.append(("technical", f"Cellar {scenario.cellar_sf:,.0f} SF"))
 
     if not badges:
         return None
@@ -1712,6 +1714,7 @@ def _build_scenario_manifest_table(scenario, styles):
         ["Community Facility SF", f"{s.cf_sf:,.0f} SF" if s.cf_sf else "\u2014"],
         ["Parking Spaces", parking_spaces],
         ["Waiver Eligible", waiver],
+        ["Cellar (Below Grade)", f"{s.cellar_sf:,.0f} SF" if getattr(s, 'cellar_sf', 0) > 0 else "—"],
         ["FAR Used", f"{s.far_used:.2f}"],
         ["Max Height", f"{s.max_height_ft:.0f} ft"],
         ["Floors", str(s.num_floors)],

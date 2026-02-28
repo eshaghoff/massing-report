@@ -14,6 +14,7 @@ PLUTO_FIELDS = [
     "builtfar", "residfar", "commfar", "facilfar",
     "yearbuilt", "yearalter1", "yearalter2",
     "irrlotcode", "ext", "cd", "ct2010", "cb2010", "zipcode",
+    "histdist", "landmark",
 ]
 
 
@@ -90,4 +91,6 @@ def _parse_pluto_record(record: dict) -> PlutoData:
         ct2010=record.get("ct2010"),
         cb2010=record.get("cb2010"),
         zipcode=record.get("zipcode"),
+        histdist=record.get("histdist"),
+        landmark=record.get("landmark"),
     )

@@ -24,7 +24,7 @@ from app.models.schemas import (
     FloorAreaExemptions,
 )
 from app.zoning_engine.far_tables import (
-    get_far_for_district, get_ih_bonus, COMMERCIAL_OVERLAY_FAR,
+    get_far_for_district, get_ih_bonus, COMMERCIAL_OVERLAY_FAR, OVERLAY_COMMERCIAL_DEPTH,
     get_uap_far, get_uap_bonus_far,
 )
 from app.zoning_engine.height_setback import (
@@ -60,14 +60,15 @@ from app.zoning_engine.programs import check_all_programs, get_program_effects_s
 class ZoningCalculator:
     """Computes all allowable development parameters for a lot."""
 
-    def calculate(self, lot: LotProfile) -> dict:
+    def calculate(self, lot: LotProfile, options: dict | None = None) -> dict:
         """Full calculation: envelope + development scenarios."""
+        options = options or {}
         primary_district = lot.zoning_districts[0] if lot.zoning_districts else None
         if not primary_district:
             raise ValueError("No zoning district found for this lot.")
 
         envelope = self.calculate_envelope(lot, primary_district)
-        scenarios = self.generate_scenarios(lot, envelope, primary_district)
+        scenarios = self.generate_scenarios(lot, envelope, primary_district, options=options)
 
         # Attach building type and additional info
         btype_rules = get_building_type_rules(primary_district)
@@ -93,8 +94,12 @@ class ZoningCalculator:
         # ── Generate bonus scenarios for applicable programs with FAR bonuses ──
         bonus_scenarios = self._generate_bonus_scenarios(
             lot, envelope, primary_district, scenarios, program_results,
+            options=options,
         )
         scenarios.extend(bonus_scenarios)
+
+        # ── Sort scenarios by ZFA (highest first) ──
+        scenarios.sort(key=lambda s: s.zoning_floor_area or s.total_gross_sf or 0, reverse=True)
 
         return {
             "zoning_envelope": envelope,
@@ -216,9 +221,13 @@ class ZoningCalculator:
         )
 
     def generate_scenarios(
-        self, lot: LotProfile, envelope: ZoningEnvelope, district: str
+        self, lot: LotProfile, envelope: ZoningEnvelope, district: str,
+        options: dict | None = None,
     ) -> list[DevelopmentScenario]:
         """Generate multiple development scenarios."""
+        options = options or {}
+        include_cellar = options.get("include_cellar", True)
+        include_inclusionary = options.get("include_inclusionary", False)
         scenarios = []
         lot_area = lot.lot_area or 0
         uses = get_permitted_uses(district)
@@ -251,6 +260,7 @@ class ZoningCalculator:
                 "Maximize residential floor area with ground-floor commercial if overlay permits.",
                 max_units_by_area=max_units_by_area,
                 max_units_by_du=max_units_by_du,
+                include_cellar=include_cellar,
             )
             if scenario:
                 scenarios.append(scenario)
@@ -265,6 +275,7 @@ class ZoningCalculator:
                     lot, envelope, district, footprint,
                     target_units=max_units_by_du,
                     max_units_by_area=max_units_by_area,
+                    include_cellar=include_cellar,
                 )
                 if scenario and scenario.total_units > max_res_units:
                     scenarios.append(scenario)
@@ -278,6 +289,7 @@ class ZoningCalculator:
                 lot, envelope, district, footprint,
                 max_units_by_area=max_units_by_area,
                 max_units_by_du=max_units_by_du,
+                include_cellar=include_cellar,
             )
             if scenario:
                 scenarios.append(scenario)
@@ -286,6 +298,7 @@ class ZoningCalculator:
         if uses["commercial_allowed"] and envelope.commercial_far:
             scenario = self._build_commercial_scenario(
                 lot, envelope, district, footprint,
+                include_cellar=include_cellar,
             )
             if scenario:
                 scenarios.append(scenario)
@@ -296,6 +309,7 @@ class ZoningCalculator:
                 lot, envelope, district, footprint,
                 max_units_by_area=max_units_by_area,
                 max_units_by_du=max_units_by_du,
+                include_cellar=include_cellar,
             )
             if scenario:
                 scenarios.append(scenario)
@@ -305,6 +319,7 @@ class ZoningCalculator:
             if envelope.cf_far > (envelope.residential_far or 0):
                 scenario = self._build_cf_scenario(
                     lot, envelope, district, footprint,
+                    include_cellar=include_cellar,
                 )
                 if scenario:
                     scenarios.append(scenario)
@@ -321,6 +336,7 @@ class ZoningCalculator:
                 lot, envelope, district, footprint,
                 max_units_by_area=max_units_by_area,
                 max_units_by_du=max_units_by_du,
+                include_cellar=include_cellar,
             )
             if scenario:
                 scenarios.append(scenario)
@@ -398,12 +414,13 @@ class ZoningCalculator:
         if tower_info.get("is_tower") and uses["residential_allowed"]:
             scenario = self._build_tower_scenario(
                 lot, envelope, district, tower_info,
+                include_cellar=include_cellar,
             )
             if scenario:
                 scenarios.append(scenario)
 
         # ── 7. IH Bonus scenario (MIH areas only) ──
-        if lot.is_mih_area and envelope.ih_bonus_far:
+        if include_inclusionary and lot.is_mih_area and envelope.ih_bonus_far:
             ih_far = (envelope.residential_far or 0) + envelope.ih_bonus_far
             ih_envelope = ZoningEnvelope(
                 residential_far=ih_far,
@@ -436,6 +453,7 @@ class ZoningCalculator:
                 f"Inclusionary Housing bonus: FAR {ih_far:.2f} "
                 f"with affordable unit requirement ({mih_option.replace('_', ' ').title()}).",
                 max_units_by_du=ih_max_du,
+                include_cellar=include_cellar,
             )
             if scenario:
                 # Attach MIH details
@@ -453,7 +471,7 @@ class ZoningCalculator:
         # City of Yes: 20% FAR bonus for affordable housing at avg ≤60% AMI
         # Available citywide in R6-R12 (not just MIH areas)
         uap_far = get_uap_far(district)
-        if uap_far and uses["residential_allowed"]:
+        if include_inclusionary and uap_far and uses["residential_allowed"]:
             # Get height rules with affordable housing bonus
             uap_height = get_height_rules(district, lot.street_width, is_affordable=True)
             uap_max_height = uap_height.get("max_building_height")
@@ -498,10 +516,13 @@ class ZoningCalculator:
                 f"(+{uap_bonus:.2f} bonus) with affordable housing at avg ≤60% AMI. "
                 f"Height: {uap_max_height or 'no cap'} ft.",
                 max_units_by_du=uap_max_du,
+                include_cellar=include_cellar,
             )
             if scenario:
                 scenarios.append(scenario)
 
+        # ── Sort scenarios by ZFA (highest first) ──
+        scenarios.sort(key=lambda s: s.zoning_floor_area or s.total_gross_sf or 0, reverse=True)
         return scenarios
 
     # ──────────────────────────────────────────────────────────────
@@ -548,6 +569,7 @@ class ZoningCalculator:
         district: str,
         base_scenarios: list[DevelopmentScenario],
         program_results: list,
+        options: dict | None = None,
     ) -> list[DevelopmentScenario]:
         """Generate individual + combined bonus scenarios from applicable programs.
 
@@ -582,6 +604,8 @@ class ZoningCalculator:
         if not bonus_programs:
             return []
 
+        options = options or {}
+        include_cellar = options.get("include_cellar", True)
         lot_area = lot.lot_area or 0
         footprint = self._calculate_footprint(lot, envelope)
         scenarios: list[DevelopmentScenario] = []
@@ -622,6 +646,7 @@ class ZoningCalculator:
                 f"{bonus_far:.2f} bonus ({prog.program_name}). "
                 f"Total FAR {new_far:.2f}.",
                 max_units_by_du=bonus_du,
+                include_cellar=include_cellar,
             )
             if scenario:
                 scenarios.append(scenario)
@@ -660,6 +685,7 @@ class ZoningCalculator:
                     f"All applicable bonuses stacked: {names}. "
                     f"Total FAR {combined_far:.2f} (+{total_bonus:.2f} bonus).",
                     max_units_by_du=combined_du,
+                    include_cellar=include_cellar,
                 )
                 if scenario:
                     scenarios.append(scenario)
@@ -677,6 +703,7 @@ class ZoningCalculator:
         description: str = "",
         max_units_by_area: int | None = None,
         max_units_by_du: int | None = None,
+        include_cellar: bool = True,
     ) -> DevelopmentScenario | None:
         """Build a residential-focused development scenario."""
         lot_area = lot.lot_area or 0
@@ -757,13 +784,34 @@ class ZoningCalculator:
             parking_options=[ParkingOption(**o) for o in parking_data["parking_options"]],
         )
 
+        # ── Cellar floor (exempt from ZFA, below grade) ──
+        cellar_sf = footprint if include_cellar else 0
+        if cellar_sf > 0:
+            floors.insert(0, MassingFloor(
+                floor=0, use="cellar",
+                gross_sf=cellar_sf,
+                net_sf=cellar_sf * 0.90,
+                height_ft=10,
+            ))
+
+        # ── Elevator/stair info for description ──
+        elev_desc = ""
+        if core:
+            if core.elevators == 0:
+                elev_desc = " Walk-up (no elevator)."
+            elif core.elevators == 1:
+                elev_desc = f" 1 elevator, {core.stairs} stair{'s' if core.stairs > 1 else ''}."
+            else:
+                elev_desc = f" {core.elevators} elevators, {core.stairs} stairs."
+
         return DevelopmentScenario(
             name=name,
-            description=description,
+            description=description + elev_desc,
             total_gross_sf=total_gross,
             total_net_sf=net_residential,
             zoning_floor_area=round(zfa),
             residential_sf=net_residential,
+            cellar_sf=cellar_sf,
             total_units=unit_mix.total_units,
             unit_mix=unit_mix,
             parking=parking,
@@ -786,6 +834,7 @@ class ZoningCalculator:
         district: str, footprint: float,
         target_units: int,
         max_units_by_area: int | None = None,
+        include_cellar: bool = True,
     ) -> DevelopmentScenario | None:
         """Build a scenario that maximizes dwelling unit count.
 
@@ -890,6 +939,10 @@ class ZoningCalculator:
                 f"Maximize dwelling unit count to {target_units} units "
                 f"(DU factor: ZFA {max_zfa:,.0f} / 680 = {max_zfa/680:.2f}, "
                 f"rounded per ZR 23-52). Uses smaller unit sizes."
+                + (f" {core.elevators} elevator{'s' if core.elevators != 1 else ''}, "
+                   f"{core.stairs} stair{'s' if core.stairs > 1 else ''}."
+                   if core and core.elevators > 0
+                   else (' Walk-up (no elevator).' if core and core.elevators == 0 else ''))
             ),
             total_gross_sf=total_gross,
             total_net_sf=net_residential,
@@ -910,6 +963,7 @@ class ZoningCalculator:
             max_height_ft=floor_height_total,
             num_floors=num_floors,
             far_used=round(zfa / lot_area, 2) if lot_area else 0,
+            cellar_sf=footprint if include_cellar else 0,
         )
 
     def _build_penthouse_scenario(
@@ -917,6 +971,7 @@ class ZoningCalculator:
         district: str, footprint: float,
         max_units_by_area: int | None = None,
         max_units_by_du: int | None = None,
+        include_cellar: bool = True,
     ) -> DevelopmentScenario | None:
         """Build a 4+1 Penthouse scenario (no elevator required).
 
@@ -1076,11 +1131,13 @@ class ZoningCalculator:
             max_height_ft=total_height,
             num_floors=num_floors,
             far_used=round(zfa / lot_area, 2) if lot_area else 0,
+            cellar_sf=footprint if include_cellar else 0,
         )
 
     def _build_commercial_scenario(
         self, lot: LotProfile, envelope: ZoningEnvelope,
         district: str, footprint: float,
+        include_cellar: bool = True,
     ) -> DevelopmentScenario | None:
         """Build a commercial-focused development scenario."""
         lot_area = lot.lot_area or 0
@@ -1126,6 +1183,7 @@ class ZoningCalculator:
                 exemption_ratio=exemptions["exemption_ratio"],
                 breakdown=exemptions["breakdown"],
             ),
+            cellar_sf=footprint if include_cellar else 0,
             floors=floors,
             max_height_ft=floor_height_total,
             num_floors=num_floors,
@@ -1137,6 +1195,7 @@ class ZoningCalculator:
         district: str, footprint: float,
         max_units_by_area: int | None = None,
         max_units_by_du: int | None = None,
+        include_cellar: bool = True,
     ) -> DevelopmentScenario | None:
         """Build mixed-use scenario: ground floor retail + upper residential."""
         lot_area = lot.lot_area or 0
@@ -1147,7 +1206,17 @@ class ZoningCalculator:
 
         # Ground floor commercial (1 floor)
         ground_floor_height = FLOOR_HEIGHTS["ground_commercial"]
-        commercial_sf = footprint  # Full ground floor
+        # ── Enforce overlay commercial depth constraint ──
+        overlay_depth = None
+        for ov in lot.overlays:
+            d = OVERLAY_COMMERCIAL_DEPTH.get(ov)
+            if d is not None:
+                overlay_depth = d if overlay_depth is None else max(overlay_depth, d)
+        if overlay_depth is not None:
+            lot_front = lot.lot_frontage or 50
+            commercial_sf = min(footprint, lot_front * overlay_depth)
+        else:
+            commercial_sf = footprint  # Full ground floor
 
         # Remaining FAR for residential
         remaining_zfa = res_far * lot_area - commercial_sf
@@ -1242,9 +1311,10 @@ class ZoningCalculator:
             parking_options=[ParkingOption(**o) for o in parking_data["parking_options"]],
         )
 
+        depth_note = f", {overlay_depth}ft depth limit" if overlay_depth else ""
         return DevelopmentScenario(
             name="Mixed-Use (Retail + Residential)",
-            description="Ground floor retail with upper floor residential — most common outer-borough development.",
+            description=f"Ground floor retail ({commercial_sf:,.0f} SF{depth_note}) with upper floor residential.",
             total_gross_sf=total_gross,
             total_net_sf=net_residential + commercial_sf * 0.93,
             zoning_floor_area=round(zfa),
@@ -1261,6 +1331,7 @@ class ZoningCalculator:
                 exemption_ratio=exemptions["exemption_ratio"],
                 breakdown=exemptions["breakdown"],
             ),
+            cellar_sf=footprint if include_cellar else 0,
             floors=floors,
             max_height_ft=total_height,
             num_floors=num_floors,
@@ -1270,6 +1341,7 @@ class ZoningCalculator:
     def _build_cf_scenario(
         self, lot: LotProfile, envelope: ZoningEnvelope,
         district: str, footprint: float,
+        include_cellar: bool = True,
     ) -> DevelopmentScenario | None:
         """Build a community facility scenario."""
         lot_area = lot.lot_area or 0
@@ -1323,6 +1395,7 @@ class ZoningCalculator:
             max_height_ft=floor_height_total,
             num_floors=num_floors,
             far_used=round(zfa / lot_area, 2) if lot_area else 0,
+            cellar_sf=footprint if include_cellar else 0,
         )
 
     def _build_residential_cf_scenario(
@@ -1330,6 +1403,7 @@ class ZoningCalculator:
         district: str, footprint: float,
         max_units_by_area: int | None = None,
         max_units_by_du: int | None = None,
+        include_cellar: bool = True,
     ) -> DevelopmentScenario | None:
         """Build a combined Residential + Community Facility scenario.
 
@@ -1479,6 +1553,10 @@ class ZoningCalculator:
                 f"Combined use: residential (FAR {res_far_used}) + "
                 f"CF (FAR {cf_far_used}). Total bulk limited to highest "
                 f"single-use FAR ({max(res_far, cf_far):.1f})."
+                + (f" {core.elevators} elevator{'s' if core.elevators != 1 else ''}, "
+                   f"{core.stairs} stair{'s' if core.stairs > 1 else ''}."
+                   if core and core.elevators > 0
+                   else (' Walk-up (no elevator).' if core and core.elevators == 0 else ''))
             ),
             total_gross_sf=total_gross,
             total_net_sf=net_residential + cf_net,
@@ -1500,11 +1578,13 @@ class ZoningCalculator:
             max_height_ft=total_height,
             num_floors=num_floors,
             far_used=round(zfa / lot_area, 2) if lot_area else 0,
+            cellar_sf=footprint if include_cellar else 0,
         )
 
     def _build_tower_scenario(
         self, lot: LotProfile, envelope: ZoningEnvelope,
         district: str, tower_info: dict,
+        include_cellar: bool = True,
     ) -> DevelopmentScenario | None:
         """Build a tower-on-base scenario for high-density districts.
 
@@ -1647,6 +1727,7 @@ class ZoningCalculator:
             max_height_ft=total_height,
             num_floors=num_floors,
             far_used=round(zfa / lot_area, 2) if lot_area else 0,
+            cellar_sf=footprint if include_cellar else 0,
         )
 
     # ──────────────────────────────────────────────────────────────
