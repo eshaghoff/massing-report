@@ -1825,18 +1825,22 @@ class ZoningCalculator:
         total_gross: float, use_type: str,
     ) -> CoreEstimate:
         """Estimate vertical core requirements."""
-        # Elevators
-        if num_floors <= 6:
-            elevators = max(0, num_floors - 3)  # 0 for <=3, 1-3 for 4-6
-            elevators = min(elevators, 1)
-        elif num_floors <= 12:
+        # Elevators — per NYC Building Code (§3002.4):
+        # < 6 stories: no elevator required
+        # 6-8 stories: 1 passenger elevator
+        # 9-16 stories: 2 passenger elevators
+        # 17-24 stories: 3 passenger elevators
+        # 25+ stories: 1 per ~8 floors, minimum 3
+        if num_floors < 6:
+            elevators = 0
+        elif num_floors <= 8:
+            elevators = 1
+        elif num_floors <= 16:
             elevators = 2
-        elif num_floors <= 20:
+        elif num_floors <= 24:
             elevators = 3
-        elif num_floors <= 30:
-            elevators = 4
         else:
-            elevators = 4 + (num_floors - 30) // 15
+            elevators = max(3, math.ceil(num_floors / 8))
 
         # Stairs — NYC single-stair reform (2024):
         # ≤6 stories AND ≤4,000 SF floor plates → single staircase allowed
